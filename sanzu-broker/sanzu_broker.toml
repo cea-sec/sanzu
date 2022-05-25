@@ -1,0 +1,19 @@
+[tls]
+server_name = "localhost"
+ca_file = "/home/user/certs/rootCA.crt"
+auth_cert = "/home/user/certs/localhost.crt"
+auth_key = "/home/user/certs/localhost.key"
+# allowed_client_domains = ["domain.local"]
+
+[auth_type]
+type = "Pam"
+args = "system-auth"
+
+
+# [auth_type]
+# type = "Kerberos"
+# args = ["MY.REALM", "MY.SECOND.REALM"]
+
+[cmd_callback.on_connect]
+command_bin = "/home/user/scripts/run_video_server.py"
+command_args = ["%UNIX_SOCK_PATH%", "%USERNAME%"]

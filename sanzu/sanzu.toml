@@ -1,0 +1,78 @@
+# [tls]
+# server_name = "localhost"
+# ca_file = "/home/user/certs/rootCA.crt"
+# auth_cert = "/home/user/certs/localhost.crt"
+# auth_key = "/home/user/certs/localhost.key"
+# allowed_client_domains = ["domain.local"]
+
+# [auth_type]
+# type = "Pam"
+# args = "system-auth"
+
+[video]
+max_fps = 40
+max_stall_img = 30
+#ffmpeg_options_cmd = "./get_ffmpeg_options.py"
+#control_path = "./control_%PID%"
+
+[audio]
+sample_rate = 44100
+max_buffer_ms = 200
+
+[export_video_pci]
+device = "0x1110"
+vendor = "0x1af4"
+
+[ffmpeg.global]
+b = "2000000"
+time_base = "1/25"
+delay = "0"
+# gop_size (25 * 60 = 1500)
+g = "1500"
+# max_b_frames
+bf = "0"
+
+[ffmpeg.libx264]
+#pixel_format = "yuv420p"
+pixel_format = "yuv444p"
+
+preset = "fast"
+tune = "zerolatency"
+
+[ffmpeg.libx265]
+#pixel_format = "yuv420p"
+#pixel_format = "yuv444p"
+
+preset = "fast"
+tune = "zerolatency"
+
+[ffmpeg.h264_nvenc]
+#pixel_format = "yuv420p"
+#pixel_format = "yuv444p"
+pixel_format = "rgb0"
+
+preset = "llhq"
+rc = "cbr_ld_hq"
+rc-lookahead = "0"
+zerolatency = "1"
+
+# yuv444 profile for rgb0 pixelformat
+profile = "3"
+
+
+[ffmpeg.h264_qsv]
+pixel_format = "nv12"
+
+look_ahead = "0"
+# No parallelism => no latency
+async_depth = "1"
+
+
+[ffmpeg.hevc_qsv]
+pixel_format = "nv12"
+
+# No parallelism => no latency
+async_depth = "1"
+
+[ffmpeg.h264_v4l2m2m]
+pixel_format = "yuv420p"

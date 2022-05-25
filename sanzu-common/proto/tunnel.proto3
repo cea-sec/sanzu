@@ -1,0 +1,238 @@
+syntax = "proto3";
+package tunnel;
+
+message EventSoundRaw {
+  bytes data = 1;
+};
+
+message EventSoundEncoded {
+  repeated bytes data = 1;
+};
+
+message EventClipboard {
+  string data = 1;
+};
+
+
+message EventKerberos {
+  bytes data = 1;
+};
+
+
+message EventPamUser {
+  string user = 1;
+};
+
+message EventPamPwd {
+  string password = 1;
+}
+
+
+message PamConversation {
+  oneof msg {
+    string echo = 1;
+    string blind = 2;
+    string info = 3;
+    string error = 4;
+    bool end = 5;
+  }
+};
+
+
+message EventDisplay {
+  uint32 width = 1;
+  uint32 height = 2;
+};
+
+
+/* Server */
+
+message ServerAdaptScreen {
+  bool seamless = 1;
+}
+
+message ServerFullScreen {
+  uint32 width = 1;
+  uint32 height = 2;
+}
+
+message ServerHello {
+  string codec_name = 1;
+  bool audio = 2;
+  oneof msg {
+    ServerAdaptScreen adapt_screen = 3;
+    ServerFullScreen fullscreen = 4;
+  }
+}
+
+message ImageRaw {
+  bytes data = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+  uint32 bytes_per_line = 4;
+}
+
+message ImageEncoded {
+  bytes data = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+}
+
+message NotificationIcon {
+  uint32 width = 1;
+  uint32 height = 2;
+  bytes data = 3;
+}
+
+message Notification {
+  oneof msg {
+    string title = 1;
+    string message = 2;
+    NotificationIcon icon = 3;
+  }
+}
+
+message EventNotification {
+  repeated Notification notifications = 1;
+}
+
+
+message EventPrintFile {
+  string path = 1;
+}
+
+message EventAreaUpdt {
+  uint32 id = 1;
+  uint32 width = 2;
+  uint32 height = 3;
+  int32 x = 4;
+  int32 y = 5;
+  bool mapped = 6;
+};
+
+message EventStats  {
+  string stats = 1;
+}
+
+
+message EventError  {
+  repeated string errors = 1;
+}
+
+message MessageSrv {
+  oneof msg {
+    ImageRaw img_raw = 1;
+    ImageEncoded img_encoded = 2;
+    EventClipboard clipboard = 3;
+    EventSoundRaw sound_raw = 4;
+    EventSoundEncoded sound_encoded = 5;
+    EventCursor cursor = 6;
+    EventAreaUpdt area_updt = 7;
+    EventNotification notifications = 8;
+    EventDisplay display = 9;
+    EventStats stats = 10;
+    EventPrintFile printfile = 11;
+  }
+};
+
+message MessagesSrv {
+  repeated MessageSrv msgs = 1;
+};
+
+
+message EventCursor {
+  bytes data = 1;
+  uint32 width = 3;
+  uint32 height = 4;
+  uint32 xhot = 5;
+  uint32 yhot = 6;
+}
+
+message MessageServerOk {
+  oneof msg {
+    MessagesSrv msgssrv = 1;
+    EventKerberos kerberos = 2;
+    ServerHello hello = 3;
+    PamConversation pamconversation= 7;
+  }
+}
+
+message ServerMsgOrErr {
+  oneof msg {
+     MessageServerOk ok = 1;
+     EventError err = 2;
+  }
+};
+
+
+
+/* Client */
+
+message ClientHelloFullscreen {
+  bool audio = 1;
+  uint32 audio_sample_rate = 2;
+}
+
+message ClientHelloResolution {
+  bool audio = 1;
+  uint32 audio_sample_rate = 2;
+  uint32 width = 3;
+  uint32 height = 4;
+}
+
+message EventMove {
+  uint32 x = 1;
+  uint32 y = 2;
+};
+
+message EventButton {
+  uint32 x = 1;
+  uint32 y = 2;
+  uint32 button = 3;
+  bool updown = 4;
+};
+
+message EventKey {
+  uint32 keycode = 1;
+  bool updown = 2;
+};
+
+
+message EventWinActivate  {
+  uint32 id = 1;
+}
+
+message MessageClient {
+  oneof msg {
+    EventMove move = 1;
+    EventKey key = 2;
+    EventButton button = 3;
+    EventClipboard clipboard = 4;
+    EventDisplay display = 5;
+    EventWinActivate activate = 6;
+  }
+};
+
+message MessagesClient {
+  repeated MessageClient msgs = 1;
+};
+
+message MessageClientOk {
+  oneof msg {
+    MessagesClient msgsclient = 1;
+    EventKerberos kerberos = 2;
+    ClientHelloFullscreen clienthellofullscreen= 3;
+    ClientHelloResolution clienthelloresolution= 4;
+    EventPamUser pamuser = 5;
+    EventPamPwd pampwd = 6;
+  }
+};
+
+
+message ClientMsgOrErr {
+  oneof msg {
+     MessageClientOk ok = 1;
+     EventError err = 2;
+  }
+};
+

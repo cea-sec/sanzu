@@ -1,0 +1,29 @@
+[package]
+name = "sanzu-common"
+version = "0.1.0"
+authors = ["Fabrice Desclaux <fabrice.desclaux@cea.fr>"]
+edition = "2018"
+description = "Sanzu helper code"
+
+[build-dependencies]
+bindgen = "0.58.1"
+prost-build = "0.8.0"
+
+[dependencies]
+anyhow = "1.0.53"
+byteorder = "1.4.2"
+env_logger = "0.8.2"
+log = "0.4.13"
+prost = "0.8.0"
+rustls = "0.20.6"
+rustls-pemfile = "0.2.0"
+webpki-roots = "0.22"
+x509-parser = "0.12.0"
+
+[features]
+kerberos = ["libgssapi"]
+default = []
+
+[target.'cfg(unix)'.dependencies]
+libgssapi = {version = "0.4.5", optional = true}
+pam = {git = "https://github.com/serpilliere/pam", branch="env_and_chauthtok"}

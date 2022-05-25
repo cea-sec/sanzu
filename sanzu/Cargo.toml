@@ -1,0 +1,96 @@
+[package]
+name = "sanzu"
+version = "0.1.0"
+authors = ["Fabrice Desclaux <fabrice.desclaux@cea.fr>"]
+edition = "2018"
+readme = "README.md"
+description = "Sanzu video server, proxy and client"
+
+[build-dependencies]
+bindgen = "0.58.1"
+cc = "1.0"
+
+[dependencies]
+anyhow = "1.0.53"
+byteorder = "1.4.2"
+clap = { version="3.0.7" }
+clipboard = "0.5.0"
+cpal = "=0.13.1"
+embedded-graphics = "0.7.1"
+encoding_rs = "0.8.28"
+env_logger = "0.8.2"
+err-derive = "0.3.0"
+ffmpeg-sys-next = "5.0.1"
+hound = "3.4"
+lazy_static = "1.4.0"
+libc = "0.2"
+log = "0.4.13"
+memmap = "0.7.0"
+opus="0.2.1"
+rpassword = "5.0"
+rustls = "0.20.6"
+rustls-pemfile = "0.2.0"
+sanzu-common = { path="../sanzu-common", default-features = false}
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+spin_sleep = "0.3.7"
+toml = "0.5"
+dbus = {version = "0.9.2", optional = true}
+dbus-crossroads = {version="0.5.0", optional = true}
+notify-rust = {version = "4.3.0", features = ["images"], optional = true}
+webpki-roots = "0.22"
+rayon = "1.5.1"
+x509-parser = "0.12.0"
+
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+cpufeatures = "0.2.1"
+
+[features]
+notify = ["notify-rust", "dbus", "dbus-crossroads"]
+printfile = ["notify-rust", "dbus", "dbus-crossroads"]
+kerberos = ["libgssapi", "sanzu-common/kerberos"]
+default = ["kerberos"]
+
+[target.'cfg(windows)'.dependencies]
+ico = "0.1.0"
+tempfile = "3.3.0"
+windows_bindings = {path = "windows_bindings"}
+winapi = { version = "0.3.9", features = [
+  "impl-default", "winuser", "wingdi", "winbase", "libloaderapi", "processthreadsapi",
+  "errhandlingapi", "winerror", "commctrl", "sysinfoapi", "shobjidl", "combaseapi",
+  "commdlg", "d2d1", "objbase", "dwrite", "winnls", "shellapi", "wincodec", "stringapiset",
+  "d3d9", "d3d9types", "dwmapi"] }
+
+[target.'cfg(unix)'.dependencies]
+libgssapi = {version = "0.4.5", optional = true}
+nix = "0.23.0"
+vsock = "0.2.4"
+x11-clipboard = "0.5.3"
+xcb = { version = "0.10.1"}
+
+[dependencies.x11rb]
+version = "0.8.0"
+features = ["shm", "xtest", "xfixes", "damage", "randr"]
+
+[package.metadata.deb]
+maintainer = "Fabrice Desclaux <fabrice.desclaux@cea.fr>"
+copyright = "2021, CEA <fabrice.desclaux@cea.fr>"
+extended-description = """\
+Video server and client for remote workspace \
+based on rust."""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/sanzu_server", "usr/bin/", "755"],
+    ["target/release/sanzu_client", "usr/bin/", "755"],
+    ["target/release/sanzu_proxy", "usr/bin/", "755"],
+    ["sanzu.toml", "etc/sanzu.toml", "644"],
+    ["README.md", "usr/share/doc/sanzu/README", "644"],
+]
+conf-files = ["/etc/sanzu.toml"]
+
+
+# Compilation for Windows:
+# export PKG_CONFIG_ALLOW_CROSS=1
+# cargo build --release --target "x86_64-pc-windows-gnu"

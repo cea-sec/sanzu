@@ -1,0 +1,44 @@
+[package]
+name = "sanzu_broker"
+version = "0.1.0"
+authors = ["Fabrice Desclaux <fabrice.desclaux@cea.fr>"]
+edition = "2018"
+readme = "README.md"
+description = "Broker for sanzu video server"
+
+[build-dependencies]
+bindgen = "0.55"
+cc = "1.0"
+
+[dependencies]
+anyhow = "1.0.53"
+byteorder = "1.4.2"
+clap = {version="2.33.3" }
+env_logger = "0.8.2"
+libc = "0.2.123"
+log = "0.4.13"
+mio = { version = "0.7.13", features = ["net", "os-poll"] }
+nix = "0.23"
+rustls = "0.20.6"
+rustls-pemfile = "0.2.0"
+sanzu-common = { path="../sanzu-common", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_derive = "1.0"
+toml = "0.5"
+uuid = { version = "0.8", features = ["serde", "v4"] }
+x509-parser = "0.12.0"
+libgssapi = "0.4.5"
+
+[package.metadata.deb]
+maintainer = "Fabrice Desclaux <fabrice.desclaux@cea.fr>"
+copyright = "2021, CEA <fabrice.desclaux@cea.fr>"
+extended-description = """Broker for sanzu server"""
+depends = "$auto"
+section = "utility"
+priority = "optional"
+assets = [
+    ["target/release/sanzu_broker", "usr/bin/", "755"],
+    ["sanzu_broker.toml", "etc/sanzu_broker.toml", "644"],
+    ["README.md", "usr/share/doc/sanzu_broker/README", "644"],
+]
+conf-files = ["/etc/sanzu_broker.toml"]
