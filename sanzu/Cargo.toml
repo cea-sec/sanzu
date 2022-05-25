@@ -5,6 +5,7 @@ authors = ["Fabrice Desclaux <fabrice.desclaux@cea.fr>"]
 edition = "2018"
 readme = "README.md"
 description = "Sanzu video server, proxy and client"
+license = "GPL-3.0"
 
 [build-dependencies]
 bindgen = "0.58.1"
@@ -89,6 +90,23 @@ assets = [
     ["README.md", "usr/share/doc/sanzu/README", "644"],
 ]
 conf-files = ["/etc/sanzu.toml"]
+
+[package.metadata.deb.variants.client]
+name = "sanzu-client"
+assets = [
+    ["target/release/sanzu_client", "usr/bin/", "755"],
+    ["sanzu.toml", "etc/sanzu.toml", "644"],
+    ["README.md", "usr/share/doc/sanzu-client/README", "644"],
+]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/sanzu_server", dest = "/usr/bin/", mode = "0755" },
+    { source = "target/release/sanzu_client", dest = "/usr/bin/", mode = "0755" },
+    { source = "target/release/sanzu_proxy", dest = "/usr/bin/", mode = "0755" },
+    { source = "sanzu.toml", dest = "/etc/sanzu.toml", mode = "0644", conf = true },
+    { source = "README.md", dest = "/usr/share/doc/sanzu/README", mode = "0644", doc = true },
+]
 
 
 # Compilation for Windows:

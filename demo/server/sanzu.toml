@@ -1,0 +1,39 @@
+[video]
+max_fps = 45
+max_stall_img = 35
+control_path = "/var/run/surf_video_control/client_%PID%"
+
+[audio]
+sample_rate = 44100
+max_buffer_ms = 200
+
+[ffmpeg.global]
+b = "3000000"
+time_base = "1/45"
+delay = "0"
+# gop_size (25 * 60 = 1500)
+g = "1500"
+# max_b_frames
+bf = "0"
+#pixel_format = "yuv420p"
+pixel_format = "yuv444p"
+
+[ffmpeg.libx264]
+preset = "fast"
+tune = "zerolatency"
+
+[ffmpeg.libx265]
+preset = "fast"
+tune = "zerolatency"
+
+[ffmpeg.h264_nvenc]
+preset = "llhq"
+rc = "cbr_ld_hq"
+rc-lookahead = "0"
+zerolatency = "1"
+
+[ffmpeg.hevc_nvenc]
+preset = "llhq"
+rc = "cbr_ld_hq"
+rc-lookahead = "0"
+zerolatency = "1"

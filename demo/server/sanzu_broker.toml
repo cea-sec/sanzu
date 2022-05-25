@@ -1,0 +1,10 @@
+[tls]
+server_name = "localhost"
+ca_file = "/sanzu_demo/certs/rootCA.crt"
+auth_cert = "/sanzu_demo/certs/localhost.crt"
+auth_key = "/sanzu_demo/certs/localhost.key"
+allowed_client_domains = ["demo.local"]
+
+[cmd_callback.on_connect]
+command_bin = "/usr/local/bin/run_video_server.py"
+command_args = ["%USERNAME%", "%UNIX_SOCK_PATH%"]

@@ -5,6 +5,7 @@ authors = ["Fabrice Desclaux <fabrice.desclaux@cea.fr>"]
 edition = "2018"
 readme = "README.md"
 description = "Broker for sanzu video server"
+license = "GPL-3.0"
 
 [build-dependencies]
 bindgen = "0.55"
@@ -30,6 +31,7 @@ x509-parser = "0.12.0"
 libgssapi = "0.4.5"
 
 [package.metadata.deb]
+name = "sanzu-broker"
 maintainer = "Fabrice Desclaux <fabrice.desclaux@cea.fr>"
 copyright = "2021, CEA <fabrice.desclaux@cea.fr>"
 extended-description = """Broker for sanzu server"""
@@ -42,3 +44,10 @@ assets = [
     ["README.md", "usr/share/doc/sanzu_broker/README", "644"],
 ]
 conf-files = ["/etc/sanzu_broker.toml"]
+
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/sanzu_broker", dest = "/usr/bin/", mode = "755" },
+    { source = "sanzu_broker.toml", dest = "/etc/sanzu_broker.toml", mode = "644", config = true },
+    { source = "README.md", dest = "/usr/share/doc/sanzu_broker/README", mode = "644", doc = true },
+]

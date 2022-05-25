@@ -1,0 +1,22 @@
+[video]
+max_fps = 40
+max_stall_img = 35
+
+[audio]
+sample_rate = 44100
+max_buffer_ms = 200
+
+[ffmpeg.global]
+b = "5000000"
+time_base = "1/25"
+delay = "0"
+# gop_size (25 * 60 = 1500)
+g = "1500"
+# max_b_frames
+bf = "0"
+#pixel_format = "yuv420p"
+pixel_format = "yuv444p"
+
+[ffmpeg.libx264]
+preset = "fast"
+tune = "zerolatency"
