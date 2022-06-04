@@ -39,11 +39,11 @@ You can find more information on the architecture in `doc/architecture.md`.
 ```
 - Launch the server:
 ```
-  DISPLAY=:100 sanzu_server
+  DISPLAY=:100 sanzu_server -f sanzu.toml
 ```
   or, if the server implements GPU encoding (h264_nvenc here):
 ```
-  DISPLAY=:100 sanzu_server -e h264_nvenc
+  DISPLAY=:100 sanzu_server -f sanzu.toml -e h264_nvenc
 ```
 - On the server side, launch a window manager through X server
 ```
