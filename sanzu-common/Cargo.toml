@@ -6,7 +6,7 @@ edition = "2018"
 description = "Sanzu helper code"
 
 [build-dependencies]
-bindgen = "0.58.1"
+bindgen = "0.59.2"
 prost-build = "0.10.4"
 
 [dependencies]
