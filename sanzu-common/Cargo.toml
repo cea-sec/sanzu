@@ -16,7 +16,7 @@ env_logger = "0.8.2"
 log = "0.4.13"
 prost = "0.8.0"
 rustls = "0.20.6"
-rustls-pemfile = "0.2.0"
+rustls-pemfile = "1.0.0"
 webpki-roots = "0.22"
 x509-parser = "0.13.2"
 

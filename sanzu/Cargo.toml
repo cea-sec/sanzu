@@ -30,7 +30,7 @@ memmap = "0.7.0"
 opus="0.2.1"
 rpassword = "5.0"
 rustls = "0.20.6"
-rustls-pemfile = "0.2.0"
+rustls-pemfile = "1.0.0"
 sanzu-common = { path="../sanzu-common", default-features = false}
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
