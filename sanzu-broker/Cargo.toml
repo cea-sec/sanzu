@@ -28,7 +28,7 @@ serde_derive = "1.0"
 toml = "0.5"
 uuid = { version = "0.8", features = ["serde", "v4"] }
 x509-parser = "0.13.2"
-libgssapi = "0.4.5"
+libgssapi = "0.6.2"
 
 [package.metadata.deb]
 name = "sanzu-broker"

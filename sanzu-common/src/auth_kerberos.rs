@@ -17,7 +17,7 @@ fn setup_server_ctx() -> Result<ServerCtx> {
 
 pub fn do_kerberos_auth(allowed_realms: &[String], sock: &mut dyn ReadWrite) -> Result<String> {
     info!("Authenticating client");
-    let server_ctx = setup_server_ctx()
+    let mut server_ctx = setup_server_ctx()
         .context("Cannot setup server credentials")
         .map_err(|err| send_server_err_event(sock, err))?;
     loop {

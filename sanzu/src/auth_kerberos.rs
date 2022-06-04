@@ -38,12 +38,12 @@ pub fn perform_auth(target_name: &str, server: &mut dyn ReadWrite) -> Result<()>
     let cname = name
         .canonicalize(Some(&GSS_MECH_KRB5))
         .context("Error in canonicalize")?;
-    let client_ctx =
+    let mut client_ctx =
         setup_client_ctx(cname, &desired_mechs).context("Error in setup_client_ctx")?;
     debug!("Client ctx retrieved");
     let mut server_tok: Option<Vec<u8>> = None;
     loop {
-        match client_ctx.step(server_tok.as_deref())? {
+        match client_ctx.step(server_tok.as_deref(), None)? {
             None => {
                 let client_token = tunnel::EventKerberos { data: vec![] };
                 Tunnel::send(server, client_token).context("Error in send EventKerberos")?;
