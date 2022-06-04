@@ -18,7 +18,7 @@ clap = {version="2.33.3" }
 env_logger = "0.8.2"
 libc = "0.2.123"
 log = "0.4.13"
-mio = { version = "0.7.13", features = ["net", "os-poll"] }
+mio = { version = "0.8.3", features = ["net", "os-poll"] }
 nix = "0.23"
 rustls = "0.20.6"
 rustls-pemfile = "0.2.0"
