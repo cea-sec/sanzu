@@ -472,7 +472,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
             timings_str += &timings
                 .times
                 .iter()
-                .map(|(name, value)| format!("{} {:>7}", name, format!("{:.1?}", value)))
+                .map(|(name, value)| format!("{} {:>7.1?}", name, value))
                 .collect::<Vec<String>>()
                 .join(" ");
         }
