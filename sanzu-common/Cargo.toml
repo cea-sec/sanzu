@@ -25,5 +25,5 @@ kerberos = ["libgssapi"]
 default = []
 
 [target.'cfg(unix)'.dependencies]
-libgssapi = {version = "0.4.5", optional = true}
+libgssapi = {version = "0.6.2", optional = true}
 pam = {git = "https://github.com/serpilliere/pam", branch="env_and_chauthtok"}
