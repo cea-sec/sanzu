@@ -34,14 +34,14 @@ rustls-pemfile = "0.2.0"
 sanzu-common = { path="../sanzu-common", default-features = false}
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
-spin_sleep = "0.3.7"
+spin_sleep = "1.1.1"
 toml = "0.5"
 dbus = {version = "0.9.2", optional = true}
 dbus-crossroads = {version="0.5.0", optional = true}
 notify-rust = {version = "4.3.0", features = ["images"], optional = true}
 webpki-roots = "0.22"
 rayon = "1.5.1"
-x509-parser = "0.12.0"
+x509-parser = "0.13.2"
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
 cpufeatures = "0.2.1"
