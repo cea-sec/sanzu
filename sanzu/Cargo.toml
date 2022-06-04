@@ -34,7 +34,7 @@ rustls-pemfile = "1.0.0"
 sanzu-common = { path="../sanzu-common", default-features = false}
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
-spin_sleep = "0.3.7"
+spin_sleep = "1.1.1"
 toml = "0.5"
 dbus = {version = "0.9.2", optional = true}
 dbus-crossroads = {version="0.5.0", optional = true}
