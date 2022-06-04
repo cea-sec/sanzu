@@ -24,6 +24,7 @@ device = "0x1110"
 vendor = "0x1af4"
 
 [ffmpeg.global]
+# FFMpeg bandwidth (bits per second)
 b = "2000000"
 time_base = "1/25"
 delay = "0"

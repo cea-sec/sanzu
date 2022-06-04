@@ -137,10 +137,17 @@ mod tests {
     const CONF: &'static str = r#"
 [video]
 max_fps = 60
+max_stall_img = 30
+
+[audio]
+sample_rate = 44100
+max_buffer_ms = 200
+
 [ffmpeg.global]
-video_size = ""
+b = "2000000"
 
 [ffmpeg.libx264]
+pixel_format = "yuv444p"
 preset = "fast"
 tune = "zerolatency"
 "#;
