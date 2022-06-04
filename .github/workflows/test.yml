@@ -86,3 +86,12 @@ jobs:
       - name: Check format
         run: cargo fmt --all -- --check
 
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Security audit
+        uses: actions-rs/audit-check@v1
+        with:
+         token: ${{ secrets.GITHUB_TOKEN }}
+
