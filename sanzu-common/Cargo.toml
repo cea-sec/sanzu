@@ -7,7 +7,7 @@ description = "Sanzu helper code"
 
 [build-dependencies]
 bindgen = "0.58.1"
-prost-build = "0.8.0"
+prost-build = "0.10.4"
 
 [dependencies]
 anyhow = "1.0.53"
