@@ -14,8 +14,6 @@ use x11rb::{
 
 use x11_clipboard::Clipboard;
 
-use xcb::xproto::Atom;
-
 use encoding_rs::mem::decode_latin1;
 
 /// Convert a xfixes event (for clipboard modification) into a x11 selection event
@@ -32,7 +30,7 @@ pub fn convert_event<C: Connection>(conn: &C, window: Window, atom_selection: u3
         .reply()
         .context("Error in UTF8_STRING reply")?;
 
-    let atom_property_a: Atom = atom_property.atom;
+    let atom_property_a = atom_property.atom;
 
     conn.convert_selection(
         window,
