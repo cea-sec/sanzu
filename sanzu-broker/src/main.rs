@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 #[macro_use]
 extern crate log;
 
-use clap::{App, Arg};
+use clap::{Arg, Command};
 mod config;
 
 use config::{read_config, AuthType, Config};
@@ -34,7 +34,7 @@ use std::{
     fs::remove_file,
     io::{Read, Write},
     net::{IpAddr, SocketAddr},
-    process::Command,
+    process,
 };
 
 use uuid::Uuid;
@@ -217,7 +217,7 @@ pub fn connect_user(
         .context(format!("Error in UnixListener bind {:?}", socket_path))?;
 
     debug!("bin {} args {:?}", on_connect.command_bin, args);
-    let status = Command::new(&on_connect.command_bin)
+    let status = process::Command::new(&on_connect.command_bin)
         .args(&args)
         .status()
         .context("Cannot exec connect callback")?;
@@ -313,28 +313,28 @@ fn serve_user(config: &Config, address: IpAddr, port: u16) -> Result<()> {
 
 fn main() -> Result<()> {
     env_logger::Builder::from_default_env().init();
-    let matches = App::new("Surf server")
+    let matches = Command::new("Surf server")
         .version("0.1.0")
         .about("Manage client connection")
         .arg(
-            Arg::with_name("config")
-                .short("f")
+            Arg::new("config")
+                .short('f')
                 .long("config")
                 .help("configuration file")
                 .default_value(DEFAULT_CONFIG)
                 .takes_value(true),
         )
         .arg(
-            Arg::with_name("listen")
-                .short("l")
+            Arg::new("listen")
+                .short('l')
                 .long("listen")
                 .takes_value(true)
                 .default_value("127.0.0.1")
                 .help("Listen address"),
         )
         .arg(
-            Arg::with_name("port")
-                .short("p")
+            Arg::new("port")
+                .short('p')
                 .long("port")
                 .takes_value(true)
                 .default_value("1122")
