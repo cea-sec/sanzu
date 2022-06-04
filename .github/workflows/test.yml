@@ -1,0 +1,76 @@
+name: Build & test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+    # Dependency list: build/Dockerfile-debian
+    - name: Install dependencies
+      run: |
+        sudo apt-get install -y --no-install-recommends \
+        libasound2-dev \
+        ffmpeg \
+        libavutil-dev \
+        libclang-dev \
+        libkrb5-dev \
+        libx264-dev \
+        libx264-dev \
+        libxcb-render0-dev \
+        libxcb-shape0-dev \
+        libxcb-xfixes0-dev \
+        libxdamage-dev \
+        libxext-dev \
+        x264 \
+        xcb \
+        libavformat-dev \
+        libavfilter-dev \
+        libavdevice-dev \
+        dpkg-dev \
+        libpam0g-dev \
+        libdbus-1-dev
+    - name: Build
+      env:
+        RUSTFLAGS: -D warnings
+      uses: actions-rs/cargo@v1
+      with:
+        command: build
+        args: --release --all --verbose --all-features
+    - name: Run tests
+      run: cargo test --all --release --verbose --all-features
+
+    # Upload resulting artifacts:
+    # sanzu_broker, sanzu_client, sanzu_proxy, sanzu_server
+    - name: Upload resulting 'sanzu_broker'
+      uses: actions/upload-artifact@v1
+      with:
+        name: sanzu_broker
+        path: ./target/release/sanzu_broker
+    - name: Upload resulting 'sanzu_client'
+      uses: actions/upload-artifact@v1
+      with:
+        name: sanzu_client
+        path: ./target/release/sanzu_client
+    - name: Upload resulting 'sanzu_proxy'
+      uses: actions/upload-artifact@v1
+      with:
+        name: sanzu_proxy
+        path: ./target/release/sanzu_proxy
+    - name: Upload resulting 'sanzu_server'
+      uses: actions/upload-artifact@v1
+      with:
+        name: sanzu_server
+        path: ./target/release/sanzu_server
