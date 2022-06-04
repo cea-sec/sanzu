@@ -18,7 +18,7 @@ prost = "0.8.0"
 rustls = "0.20.6"
 rustls-pemfile = "0.2.0"
 webpki-roots = "0.22"
-x509-parser = "0.12.0"
+x509-parser = "0.13.2"
 
 [features]
 kerberos = ["libgssapi"]

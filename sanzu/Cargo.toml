@@ -41,7 +41,7 @@ dbus-crossroads = {version="0.5.0", optional = true}
 notify-rust = {version = "4.3.0", features = ["images"], optional = true}
 webpki-roots = "0.22"
 rayon = "1.5.1"
-x509-parser = "0.12.0"
+x509-parser = "0.13.2"
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
 cpufeatures = "0.2.1"
@@ -67,10 +67,9 @@ libgssapi = {version = "0.6.2", optional = true}
 nix = "0.23.0"
 vsock = "0.2.4"
 x11-clipboard = "0.5.3"
-xcb = { version = "0.10.1"}
 
 [dependencies.x11rb]
-version = "0.8.0"
+version = "0.9.0"
 features = ["shm", "xtest", "xfixes", "damage", "randr"]
 
 [package.metadata.deb]
