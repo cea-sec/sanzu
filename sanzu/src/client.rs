@@ -186,7 +186,7 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
             .context("Error in read login")
             .map_err(|err| send_client_err_event(server, err))?;
         user.pop(); // Remove "\n"
-        let password = rpassword::read_password_from_tty(Some("Password: "))
+        let password = rpassword::prompt_password("Password: ")
             .context("Error in read password")
             .map_err(|err| send_client_err_event(server, err))?;
 
@@ -215,7 +215,7 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
                 }
                 Some(tunnel::pam_conversation::Msg::Blind(blind)) => {
                     println!("{}", blind);
-                    let password = rpassword::read_password_from_tty(Some("Password: "))
+                    let password = rpassword::prompt_password("Password: ")
                         .context("Error in read password")
                         .map_err(|err| send_client_err_event(server, err))?;
                     let client_pwd = tunnel::EventPamPwd { password };
