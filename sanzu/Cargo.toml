@@ -28,7 +28,7 @@ libc = "0.2"
 log = "0.4.13"
 memmap = "0.7.0"
 opus="0.3.0"
-rpassword = "5.0"
+rpassword = "6.0"
 rustls = "0.20.6"
 rustls-pemfile = "1.0.0"
 sanzu-common = { path="../sanzu-common", default-features = false}
