@@ -12,7 +12,7 @@ use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use dbus::channel::MatchingReceiver;
 
 use libc::{self, shmat, shmctl, shmdt, shmget};
-use memmap::{Mmap, MmapMut};
+use memmap2::{Mmap, MmapMut};
 
 use sanzu_common::tunnel;
 

@@ -9,7 +9,7 @@ use crate::{
     video_encoder::{get_encoder_category, init_video_encoder},
 };
 use byteorder::{LittleEndian, ReadBytesExt};
-use memmap::MmapOptions;
+use memmap2::MmapOptions;
 use sanzu_common::{tunnel, ReadWrite, Tunnel};
 
 use std::{
