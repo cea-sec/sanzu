@@ -1,3 +1,5 @@
+use anyhow::{Context, Result};
+
 #[macro_use]
 extern crate log;
 
@@ -7,7 +9,7 @@ use sanzu::{config::read_server_config, server, utils::ArgumentsSrv};
 
 const DEFAULT_CONFIG: &str = "/etc/sanzu.toml";
 
-fn main() {
+fn main() -> Result<()> {
     env_logger::Builder::from_default_env()
         .format_timestamp_nanos()
         .init();
@@ -147,7 +149,7 @@ fn main() {
     let encoder_name = matches.value_of("encoder").unwrap_or("libx264");
     let raw_sound = matches.is_present("raw_sound");
     let conf = read_server_config(matches.value_of("config").unwrap())
-        .expect("Cannot read configuration file");
+        .context("Cannot read configuration file")?;
     let vsock = matches.is_present("vsock");
     let unixsock = matches.is_present("unixsock");
     let connect_unixsock = matches.is_present("connect-unixsock");
@@ -177,4 +179,5 @@ fn main() {
         error!("Server error");
         err.chain().for_each(|cause| error!(" - due to {}", cause));
     }
+    Ok(())
 }
