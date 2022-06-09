@@ -9,7 +9,7 @@ use sanzu_common::{
     tls_helper::{get_subj_alt_names, make_server_config, tls_do_handshake},
     tunnel,
     utils::get_username_from_principal,
-    ReadWrite, Tunnel,
+    ReadWrite, Stdio, Tunnel,
 };
 
 use spin_sleep::LoopHelper;
@@ -107,8 +107,9 @@ fn auth_client(
 pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
     info!("Start server");
 
-    let mut sock: Box<dyn ReadWrite> = match (arguments.vsock, arguments.unixsock) {
-        (true, false) => {
+    let mut sock: Box<dyn ReadWrite> = match (arguments.vsock, arguments.stdio, arguments.unixsock)
+    {
+        (true, false, false) => {
             #[cfg(unix)]
             {
                 let port = arguments
@@ -131,7 +132,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
                 return Err(anyhow!("Vsock not supported on windows"));
             }
         }
-        (false, true) => {
+        (false, false, true) => {
             #[cfg(unix)]
             {
                 let socket = if arguments.connect_unixsock {
@@ -147,10 +148,20 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
             }
             #[cfg(windows)]
             {
-                return Err(anyhow!("Vsock not supported on windows"));
+                return Err(anyhow!("Unix sockets are not supported on windows"));
             }
         }
-        (false, false) => {
+        (false, true, false) => {
+            #[cfg(unix)]
+            {
+                Box::new(Stdio {})
+            }
+            #[cfg(windows)]
+            {
+                return Err(anyhow!("STDIO is not supported on windows"));
+            }
+        }
+        (false, false, false) => {
             let port = arguments
                 .port
                 .parse::<u16>()
@@ -168,7 +179,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
             Box::new(socket)
         }
         _ => {
-            return Err(anyhow!("vsock / unixsock arguments error"));
+            return Err(anyhow!("vsock / stdio / unixsock arguments error"));
         }
     };
 

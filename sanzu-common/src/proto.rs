@@ -22,6 +22,25 @@ const MAX_PACKET_LEN: usize = 100 * 1024 * 1024; // 100 Mo
 pub trait ReadWrite: Read + Write {}
 impl<T: Read + Write> ReadWrite for T {}
 
+pub struct Stdio {}
+
+impl Write for Stdio {
+    fn write(&mut self, buf: &[u8]) -> Result<usize, std::io::Error> {
+        let ret = std::io::stdout().write(buf);
+        self.flush()?;
+        ret
+    }
+    fn flush(&mut self) -> Result<(), std::io::Error> {
+        std::io::stdout().flush()
+    }
+}
+
+impl Read for Stdio {
+    fn read(&mut self, buf: &mut [u8]) -> Result<usize, std::io::Error> {
+        std::io::stdin().read(buf)
+    }
+}
+
 /// Tunnel object
 pub struct Tunnel {}
 
