@@ -29,7 +29,8 @@ windows:
 		     avutil-*.dll avdevice-*.dll avcodec-*.dll \
 		     swresample-*.dll ../bin/libssp-*.dll \
 		 /SRC/target/x86_64-pc-windows-gnu/release/"
-	cd ../target/x86_64-pc-windows-gnu/release ; 7z a sanzu-$(SANZU_VERSION)-x86_64-pc-windows-gnu.zip *.exe *.dll
+	mkdir ../target/windows
+	cd ../target/x86_64-pc-windows-gnu/release ; 7z a ../../windows/sanzu-$(SANZU_VERSION)-x86_64-pc-windows-gnu.zip sanzu_client.exe *.dll
 
 clean:
 	rm -fr ../target/
