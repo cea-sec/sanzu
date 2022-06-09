@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 
-use clipboard::{ClipboardContext, ClipboardProvider};
+use clipboard_win::{formats, get_clipboard};
 
 use sanzu_common::tunnel;
 
@@ -90,8 +90,7 @@ pub extern "system" fn custom_wnd_proc(
 
         WM_DRAWCLIPBOARD => {
             info!("clipboard!");
-            let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-            if let Ok(data) = ctx.get_contents() {
+            if let Ok(data) = get_clipboard(formats::Unicode) {
                 info!("Send clipboard {}", data);
 
                 let eventclipboard = tunnel::EventClipboard { data };
