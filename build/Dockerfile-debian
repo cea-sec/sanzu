@@ -5,6 +5,8 @@ RUN set -eux; \
     apt-get install -y --no-install-recommends dpkg-dev pkg-config python3; \
     cargo install cargo-deb ; \
     apt-get install -y --no-install-recommends \
+      cmake \
+      g++ \
       libasound2-dev \
       ffmpeg \
       libavutil-dev \
