@@ -23,8 +23,8 @@ RUN set -eux; \
      pam-devel \
      python3; \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path ; \
-    cargo install cargo-generate-rpm ; 
+    cargo install cargo-generate-rpm ;
 
-    
+
 WORKDIR /SRC
 CMD cargo build $CARGO_OPT ; cargo generate-rpm $CARGORPM_OPT
