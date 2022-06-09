@@ -5,7 +5,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 
-use clipboard::{ClipboardContext, ClipboardProvider};
+use clipboard_win::{formats, get_clipboard, set_clipboard};
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -748,8 +748,7 @@ pub extern "system" fn custom_wnd_proc(
 
         WM_DRAWCLIPBOARD => {
             info!("clipboard draw");
-            let mut ctx: ClipboardContext = ClipboardProvider::new().unwrap();
-            if let Ok(data) = ctx.get_contents() {
+            if let Ok(data) = get_clipboard(formats::Unicode) {
                 trace!("Send clipboard {}", data);
 
                 let eventclipboard = tunnel::EventClipboard { data };
@@ -1366,10 +1365,7 @@ impl Client for ClientWindows {
     }
 
     fn set_clipboard(&mut self, data: &str) -> Result<()> {
-        let mut ctx: ClipboardContext = ClipboardProvider::new()
-            .map_err(|err| anyhow!("Err {:?}", err))
-            .context("Error in new ClipboardProvider")?;
-        ctx.set_contents(data.to_owned())
+        set_clipboard(formats::Unicode, data)
             .map_err(|err| anyhow!("Err {:?}", err))
             .context("Cannot set clipboard")?;
         Ok(())
