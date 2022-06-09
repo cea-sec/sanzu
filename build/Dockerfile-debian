@@ -25,6 +25,6 @@ RUN set -eux; \
       dpkg-dev \
       libpam0g-dev \
       libdbus-1-dev ;
-    
+
 WORKDIR /SRC
 CMD cargo deb $CARGODEB_OPT -- $CARGO_OPT
