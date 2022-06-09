@@ -1,19 +1,24 @@
 
 DOCKER_OPT=-v ${PWD}/../:/SRC --env CARGO_HOME=/SRC/target/.cargo
-CARGO_OPT=""
+CARGO_OPT="--release"
 DOCKER_USER=`id -u`:`id -g`
 SANZU_VERSION:=$(shell grep "^version" ../sanzu/Cargo.toml  | head -1 | cut -d'"' -f2)
 
 debian:
 	docker build -t sanzu-builder:debian -f Dockerfile-debian .
-	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu" sanzu-builder:debian 
-	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu --variant=client" sanzu-builder:debian 
-	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu_broker" sanzu-builder:debian 
+	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:debian
+	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu --variant=client" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:debian
+	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu_broker" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:debian
 
 almalinux:
 	docker build -t sanzu-builder:almalinux -f Dockerfile-almalinux .
-	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu" sanzu-builder:almalinux 
-	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu-broker" sanzu-builder:almalinux 
+	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux
+	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu-broker" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux
 
 windows:
 	docker build -t sanzu-builder:windows -f Dockerfile-windows .
