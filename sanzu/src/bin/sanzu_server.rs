@@ -55,6 +55,12 @@ fn main() -> Result<()> {
                 .help("Listen address"),
         )
         .arg(
+            Arg::new("stdio")
+                .long("stdio")
+                .takes_value(false)
+                .help("Uses STDIO instead of listining on a TCP port"),
+        )
+        .arg(
             Arg::new("port")
                 .short('p')
                 .long("port")
@@ -151,6 +157,7 @@ fn main() -> Result<()> {
     let conf = read_server_config(matches.value_of("config").unwrap())
         .context("Cannot read configuration file")?;
     let vsock = matches.is_present("vsock");
+    let stdio = matches.is_present("stdio");
     let unixsock = matches.is_present("unixsock");
     let connect_unixsock = matches.is_present("connect-unixsock");
     let export_video_pci = matches.is_present("export_video_pci");
@@ -160,6 +167,7 @@ fn main() -> Result<()> {
 
     let arguments = ArgumentsSrv {
         vsock,
+        stdio,
         unixsock,
         connect_unixsock,
         address,

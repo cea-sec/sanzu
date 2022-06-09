@@ -14,6 +14,7 @@ pub enum ClipboardSelection {
 
 pub struct ArgumentsSrv<'a> {
     pub vsock: bool,
+    pub stdio: bool,
     pub unixsock: bool,
     pub connect_unixsock: bool,
     pub address: &'a str,
