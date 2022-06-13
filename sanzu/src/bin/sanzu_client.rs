@@ -137,9 +137,7 @@ Ex: -j c:\user\dupond\printdir\
                 .short('p')
                 .long("proxycommand")
                 .takes_value(true)
-                .multiple_values(true)
-                .allow_hyphen_values(true)
-                .value_terminator("%")
+                .help("Command to execute to establish connection"),
         );
 
     #[cfg(feature = "kerberos")]
@@ -194,9 +192,7 @@ Ex: -j c:\user\dupond\printdir\
             ffmpeg: HashMap::new(),
         },
     };
-    let proxycommand = matches
-        .values_of("proxycommand")
-        .map(|values| values.collect());
+    let proxycommand = matches.value_of("proxycommand");
 
     let arguments = ArgumentsClient {
         address: server_ip,

@@ -53,8 +53,15 @@ You can find more information on the architecture in `doc/architecture.md`.
 ```
   ./sanzu_client 192.168.0.1 1122
 ```
-
 By default, sound is disabled. To enable it, server and client should be launched with option "-a".
+
+## Replacement of ssh -Y
+If you have a server, let's say Rochefort, which runs a X server on the display :1234, you can access it with:
+```
+sanzu_client 127.0.0.1 1337 --proxycommand "ssh rochefort DISPLAY=:1234 sanzu_server --stdio"
+```
+In this case the connection is done throught ssh so ip and port are useless. The server must have the configuration file "/etc/sanzu.toml" present or specified with the "--config" flag.
+
 
 ## Client compilation
 ### Debian
