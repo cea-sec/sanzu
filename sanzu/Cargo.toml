@@ -69,7 +69,7 @@ vsock = "0.2.4"
 x11-clipboard = "0.6.1"
 
 [dependencies.x11rb]
-version = "0.9.0"
+version = "0.10.0"
 features = ["shm", "xtest", "xfixes", "damage", "randr"]
 
 [package.metadata.deb]
