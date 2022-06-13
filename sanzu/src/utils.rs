@@ -46,7 +46,7 @@ pub struct ArgumentsClient<'a> {
     pub window_mode: bool,
     pub decoder_name: Option<&'a str>,
     pub printdir: Option<&'a str>,
-    pub proxycommand: Option<Vec<&'a str>>,
+    pub proxycommand: Option<&'a str>,
 }
 
 pub struct ArgumentsProxy<'a> {

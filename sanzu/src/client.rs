@@ -35,6 +35,8 @@ use crate::{
     video_decoder::init_video_codec,
 };
 
+const SHELL_PATH: &str = "/bin/sh";
+
 struct StreamPipes {
     pipe_in: ChildStdout,
     pipe_out: ChildStdin,
@@ -116,12 +118,13 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
             socket.set_nodelay(true).context("Error in set_nodelay")?;
             Box::new(socket)
         }
-        Some(arguments) => {
+        Some(commandline) => {
             /* Launch proxy command*/
-            let mut child = Command::new(arguments[0])
+            let mut child = Command::new(SHELL_PATH)
+                .arg("-c")
+                .arg(&commandline)
                 .stdout(Stdio::piped())
                 .stdin(Stdio::piped())
-                .args(&arguments[1..])
                 .spawn()
                 .context("Error in launch proxycommand")?;
             info!("Proxycommand {:?}", child);

@@ -56,6 +56,7 @@ fn main() -> Result<()> {
         )
         .arg(
             Arg::new("stdio")
+                .short('m')
                 .long("stdio")
                 .takes_value(false)
                 .help("Uses STDIO instead of listining on a TCP port"),
