@@ -180,24 +180,6 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
         if arguments.tls_server_name.is_none() {
             println!("WARNING: no tls, password will be sent in clear text");
         }
-        let mut user = String::new();
-        let stdin = std::io::stdin();
-        print!("Login: ");
-        std::io::stdout().flush().unwrap();
-        stdin
-            .read_line(&mut user)
-            .context("Error in read login")
-            .map_err(|err| send_client_err_event(server, err))?;
-        user.pop(); // Remove "\n"
-        let password = rpassword::prompt_password("Password: ")
-            .context("Error in read password")
-            .map_err(|err| send_client_err_event(server, err))?;
-
-        let client_user = tunnel::EventPamUser { user };
-        send_client_msg_type!(server, client_user, Pamuser)
-            .context("Error in send EventPamUser")?;
-        let client_pwd = tunnel::EventPamPwd { password };
-        send_client_msg_type!(server, client_pwd, Pampwd).context("Error in send EventPamPwd")?;
         loop {
             let msg = recv_server_msg_type!(server, Pamconversation)
                 .context("Error in recv PamConversation")?;
@@ -217,8 +199,7 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
                         .context("Error in send EventPamUser")?;
                 }
                 Some(tunnel::pam_conversation::Msg::Blind(blind)) => {
-                    println!("{}", blind);
-                    let password = rpassword::prompt_password("Password: ")
+                    let password = rpassword::prompt_password(blind)
                         .context("Error in read password")
                         .map_err(|err| send_client_err_event(server, err))?;
                     let client_pwd = tunnel::EventPamPwd { password };
