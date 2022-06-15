@@ -60,7 +60,7 @@ winapi = { version = "0.3.9", features = [
   "impl-default", "winuser", "wingdi", "winbase", "libloaderapi", "processthreadsapi",
   "errhandlingapi", "winerror", "commctrl", "sysinfoapi", "shobjidl", "combaseapi",
   "commdlg", "d2d1", "objbase", "dwrite", "winnls", "shellapi", "wincodec", "stringapiset",
-  "d3d9", "d3d9types", "dwmapi"] }
+  "d3d9", "d3d9types", "dwmapi", "d3d11", "dxgi1_2"] }
 
 [target.'cfg(unix)'.dependencies]
 libgssapi = {version = "0.6.2", optional = true}

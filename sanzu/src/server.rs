@@ -4,12 +4,14 @@ use anyhow::{Context, Result};
 use sanzu_common::auth_kerberos::do_kerberos_auth;
 #[cfg(target_family = "unix")]
 use sanzu_common::auth_pam::do_pam_auth;
+#[cfg(target_family = "unix")]
+use sanzu_common::Stdio;
 use sanzu_common::{
     proto::{recv_client_msg_or_error, send_server_err_event},
     tls_helper::{get_subj_alt_names, make_server_config, tls_do_handshake},
     tunnel,
     utils::get_username_from_principal,
-    ReadWrite, Stdio, Tunnel,
+    ReadWrite, Tunnel,
 };
 
 use spin_sleep::LoopHelper;
@@ -200,8 +202,11 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
         None => (Box::new(sock), false),
     };
 
+    #[cfg(windows)]
+    info!("Tls state: {}", has_tls);
+
+    #[cfg(any(target_family = "unix", feature = "kerberos"))]
     if let Some(auth_type) = &config.auth_type {
-        #[cfg(any(target_family = "unix", feature = "kerberos"))]
         match auth_type {
             #[cfg(all(unix, feature = "kerberos"))]
             AuthType::Kerberos(realms) => {
