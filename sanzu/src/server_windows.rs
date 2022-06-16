@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 
-use clipboard_win::{formats, get_clipboard};
+use clipboard_win::{formats, get_clipboard, set_clipboard};
 
 use sanzu_common::tunnel;
 
@@ -811,6 +811,13 @@ impl Server for ServerInfo {
                 Some(tunnel::message_client::Msg::Display(event)) => {
                     server_events.push(ServerEvent::ResolutionChange(event.width, event.height));
                 }
+                Some(tunnel::message_client::Msg::Clipboard(event)) => {
+                    info!("Clipboard retrieved from client");
+                    set_clipboard(formats::Unicode, event.data.clone())
+                        .map_err(|err| anyhow!("Err {:?}", err))
+                        .context("Cannot set clipboard")?;
+                }
+
                 _ => {}
             }
         }
