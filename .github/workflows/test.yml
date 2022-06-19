@@ -75,60 +75,39 @@ jobs:
         name: sanzu_server
         path: ./target/release/sanzu_server
 
-  build-cross-client-windows:
-    runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: sanzu
+  build-windows:
+    runs-on: windows-latest
 
     steps:
     - uses: actions/checkout@v2
     - uses: actions-rs/toolchain@v1
       with:
         toolchain: stable
-        target: x86_64-pc-windows-gnu
-    # Dependency list: build/Dockerfile-windows
-    - name: Install dependencies
+
+    - name: prepare vcpkg
       run: |
-        sudo apt-get install -y --no-install-recommends \
-        mingw-w64 \
-        pkg-config dpkg-dev python3 \
-        libasound2-dev \
-        ffmpeg \
-        libavutil-dev \
-        libclang-dev \
-        libkrb5-dev \
-        libx264-dev \
-        libx264-dev \
-        libxcb-render0-dev \
-        libxcb-shape0-dev \
-        libxcb-xfixes0-dev \
-        libxdamage-dev \
-        libxext-dev \
-        x264 \
-        xcb \
-        libavformat-dev \
-        libavfilter-dev \
-        libavdevice-dev \
-        dpkg-dev \
-        libpam0g-dev \
-        libdbus-1-dev
+        vcpkg integrate install
+    - name: install dep
+      run: |
+        vcpkg install ffmpeg:x64-windows
     - name: Build
-      env:
-        RUSTFLAGS: -D warnings
-        PKG_CONFIG_ALLOW_CROSS: 1
       uses: actions-rs/cargo@v1
       with:
         command: build
-        args: --release --target "x86_64-pc-windows-gnu"
-    - name: Upload resulting 'sanzu_client.exe'
+        args: --release --verbose -p sanzu --no-default-features
+
+    - name: Upload resulting 'sanzu_client'
       uses: actions/upload-artifact@v1
       with:
-        name: sanzu_client.exe
-        path: ./target/x86_64-pc-windows-gnu/release/sanzu_client.exe
+        name: sanzu_client
+        path: ./target/release/sanzu_client.exe
 
-
+    - name: Upload resulting 'sanzu_server'
+      uses: actions/upload-artifact@v1
+      with:
+        name: sanzu_client
+        path: ./target/release/sanzu_server.exe
   fmt:
     runs-on: ubuntu-latest
     steps:
