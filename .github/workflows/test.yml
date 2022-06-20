@@ -92,6 +92,8 @@ jobs:
       run: |
         vcpkg install ffmpeg:x64-windows
     - name: Build
+      env:
+        RUSTFLAGS: -D warnings
       uses: actions-rs/cargo@v1
       with:
         command: build
