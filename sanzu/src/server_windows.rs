@@ -7,7 +7,7 @@ use crate::{
 };
 use anyhow::{Context, Result};
 
-use clipboard_win::{formats, get_clipboard};
+use clipboard_win::{formats, get_clipboard, set_clipboard};
 
 use sanzu_common::tunnel;
 
@@ -15,6 +15,7 @@ use std::{
     ffi::CString,
     ptr::null_mut,
     sync::{
+        atomic,
         mpsc::{channel, Receiver, Sender},
         Mutex,
     },
@@ -27,16 +28,16 @@ use spin_sleep::sleep;
 use winapi::{
     ctypes::c_void,
     shared::{
+        dxgi, dxgi1_2, dxgitype,
+        guiddef::GUID,
         minwindef::{LPARAM, LRESULT, UINT, WPARAM},
         windef::HWND,
+        winerror::{DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_WAIT_TIMEOUT, SUCCEEDED},
     },
     um::{
+        d3d11, d3dcommon,
         libloaderapi::GetModuleHandleA,
-        wingdi::{
-            BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, GetDIBits, GetDeviceCaps,
-            GetObjectA, SelectObject, BITMAP, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS, HORZRES,
-            SRCCOPY, VERTRES,
-        },
+        wingdi::{GetDeviceCaps, HORZRES, VERTRES},
         winuser::{
             CreateWindowExA, DefWindowProcA, DispatchMessageA, GetDC, PeekMessageA,
             RegisterClassExA, SendInput, SetClipboardViewer, TranslateMessage, INPUT,
@@ -45,7 +46,7 @@ use winapi::{
             MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
             MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MSG, PM_REMOVE, WM_DRAWCLIPBOARD, WM_KILLFOCUS,
             WM_QUIT, WM_SETFOCUS, WNDCLASSEXA, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_DLGFRAME,
-            WS_POPUP, WS_VISIBLE,
+            WS_POPUP,
         },
     },
 };
@@ -74,7 +75,22 @@ pub struct ServerInfo {
     pub event_receiver: Receiver<tunnel::MessageSrv>,
 }
 
-pub extern "system" fn custom_wnd_proc(
+lazy_static! {
+    static ref P_DIRECT3D_DEVICE: atomic::AtomicPtr<d3d11::ID3D11Device> =
+        atomic::AtomicPtr::new(null_mut());
+    static ref P_DIRECT3D_DEVICE_CONTEXT: atomic::AtomicPtr<d3d11::ID3D11DeviceContext> =
+        atomic::AtomicPtr::new(null_mut());
+    static ref P_OUTPUTDUPLICATION: atomic::AtomicPtr<dxgi1_2::IDXGIOutputDuplication> =
+        atomic::AtomicPtr::new(null_mut());
+    static ref P_TEXTURE2D: atomic::AtomicPtr<d3d11::ID3D11Texture2D> =
+        atomic::AtomicPtr::new(null_mut());
+    static ref P_SURFACE: atomic::AtomicPtr<dxgi::IDXGISurface> =
+        atomic::AtomicPtr::new(null_mut());
+    static ref SURFACE_MAP_ADDR: atomic::AtomicPtr<u8> = atomic::AtomicPtr::new(null_mut());
+    static ref SURFACE_MAP_PITCH: atomic::AtomicI32 = atomic::AtomicI32::new(0);
+}
+
+extern "system" fn custom_wnd_proc(
     hwnd: HWND,
     msg: UINT,
     wparam: WPARAM,
@@ -136,6 +152,433 @@ fn set_mouse_position(server_info: &mut ServerInfo, event_x: u32, event_y: u32) 
     };
 }
 
+// https://github.com/apitrace/apitrace/blob/master/lib/guids/guids_entries.h
+
+fn d3d11_get_device_idxgidevice(device: &d3d11::ID3D11Device) -> Result<&dxgi::IDXGIDevice> {
+    /* GUID_ENTRY(0x54ec77fa,0x1377,0x44e6,0x8c,0x32,0x88,0xfd,0x5f,0x44,0xc8,0x4c,IID_IDXGIDevice) */
+    let riid_idxgidevice = GUID {
+        Data1: 0x54ec77fa,
+        Data2: 0x1377,
+        Data3: 0x44e6,
+        Data4: [0x8c, 0x32, 0x88, 0xfd, 0x5f, 0x44, 0xc8, 0x4c],
+    };
+
+    let mut p_idxgidevice: *mut c_void = null_mut();
+
+    let ret = unsafe {
+        device.QueryInterface(&riid_idxgidevice as *const _, &mut p_idxgidevice as *mut _)
+    };
+
+    if SUCCEEDED(ret) {
+        info!("Query interface success {:?}", p_idxgidevice);
+    } else {
+        error!("Error in queryinterface");
+        return Err(anyhow!("Error in query interface idxgidevice"));
+    }
+    let p_idxgidevice: *mut dxgi::IDXGIDevice = unsafe { std::mem::transmute(p_idxgidevice) };
+    unsafe { p_idxgidevice.as_ref() }.context("Null idxgiadapter")
+}
+
+fn d3d11_get_idxgidevice_idxgiadapter(
+    idxgidevice: &dxgi::IDXGIDevice,
+) -> Result<&dxgi::IDXGIAdapter> {
+    /* GUID_ENTRY(0x2411e7e1,0x12ac,0x4ccf,0xbd,0x14,0x97,0x98,0xe8,0x53,0x4d,0xc0,IID_IDXGIAdapter) */
+    let riid_idxgiadapter = GUID {
+        Data1: 0x2411e7e1,
+        Data2: 0x12ac,
+        Data3: 0x4ccf,
+        Data4: [0xbd, 0x14, 0x97, 0x98, 0xe8, 0x53, 0x4d, 0xc0],
+    };
+
+    let mut p_idxgiadapter: *mut c_void = null_mut();
+
+    let ret = unsafe {
+        idxgidevice.GetParent(
+            &riid_idxgiadapter as *const _,
+            &mut p_idxgiadapter as *mut _,
+        )
+    };
+
+    if !SUCCEEDED(ret) {
+        error!("Error in get parent idxgiadapter");
+        return Err(anyhow!("Error in get parent idxgiadapter"));
+    }
+    let p_idxgiadapter: *mut dxgi::IDXGIAdapter = unsafe { std::mem::transmute(p_idxgiadapter) };
+    unsafe { p_idxgiadapter.as_ref() }.context("Null idxgiadapter")
+}
+
+fn d3d11_get_idxgioutput_idxgioutput1(
+    idxgioutput: &dxgi::IDXGIOutput,
+) -> Result<&dxgi1_2::IDXGIOutput1> {
+    /* DEFINE_GUID(IID_IDXGIOutput1,0x00cddea8,0x939b,0x4b83,0xa3,0x40,0xa6,0x85,0x22,0x66,0x66,0xcc);  */
+    let riid_idxgioutput1 = GUID {
+        Data1: 0x00cddea8,
+        Data2: 0x939b,
+        Data3: 0x4b83,
+        Data4: [0xa3, 0x40, 0xa6, 0x85, 0x22, 0x66, 0x66, 0xcc],
+    };
+
+    let mut p_idxgioutput1: *mut c_void = null_mut();
+
+    let ret = unsafe {
+        idxgioutput.QueryInterface(
+            &riid_idxgioutput1 as *const _,
+            &mut p_idxgioutput1 as *mut _,
+        )
+    };
+
+    if !SUCCEEDED(ret) {
+        error!("Error in queryinterface idxgioutput1");
+        return Err(anyhow!("Error in get parent idxgioutput1"));
+    }
+    let p_idxgioutput1: *mut dxgi1_2::IDXGIOutput1 = unsafe { std::mem::transmute(p_idxgioutput1) };
+    unsafe { p_idxgioutput1.as_ref() }.context("Null idxgioutput1")
+}
+
+fn d3d11_get_resource_texture2d(resource: &dxgi::IDXGIResource) -> Result<&d3d11::ID3D11Texture2D> {
+    /* GUID_ENTRY(0x6f15aaf2,0xd208,0x4e89,0x9a,0xb4,0x48,0x95,0x35,0xd3,0x4f,0x9c,IID_ID3D11Texture2D) */
+    let riid_id3d11texture2d = GUID {
+        Data1: 0x6f15aaf2,
+        Data2: 0xd208,
+        Data3: 0x4e89,
+        Data4: [0x9a, 0xb4, 0x48, 0x95, 0x35, 0xd3, 0x4f, 0x9c],
+    };
+
+    let mut p_id3d11texture2d: *mut c_void = null_mut();
+
+    let ret = unsafe {
+        resource.QueryInterface(
+            &riid_id3d11texture2d as *const _,
+            &mut p_id3d11texture2d as *mut _,
+        )
+    };
+
+    if !SUCCEEDED(ret) {
+        error!("Error in queryinterface id3d11texture2d");
+        return Err(anyhow!("Error in get parent id3d11texture2d"));
+    }
+    let p_id3d11texture2d: *mut d3d11::ID3D11Texture2D =
+        unsafe { std::mem::transmute(p_id3d11texture2d) };
+    unsafe { p_id3d11texture2d.as_ref() }.context("Null id3d11texture2d")
+}
+
+fn d3d11_get_texture2d_surface(texture2d: &d3d11::ID3D11Texture2D) -> Result<&dxgi::IDXGISurface> {
+    /* GUID_ENTRY(0xcafcb56c,0x6ac3,0x4889,0xbf,0x47,0x9e,0x23,0xbb,0xd2,0x60,0xec,IID_IDXGISurface) */
+    let riid_idxgisurface = GUID {
+        Data1: 0xcafcb56c,
+        Data2: 0x6ac3,
+        Data3: 0x4889,
+        Data4: [0xbf, 0x47, 0x9e, 0x23, 0xbb, 0xd2, 0x60, 0xec],
+    };
+
+    let mut p_idxgisurface: *mut c_void = null_mut();
+
+    let ret = unsafe {
+        texture2d.QueryInterface(
+            &riid_idxgisurface as *const _,
+            &mut p_idxgisurface as *mut _,
+        )
+    };
+
+    if !SUCCEEDED(ret) {
+        error!("Error in queryinterface idxgisurface");
+        return Err(anyhow!("Error in get parent idxgisurface"));
+    }
+    let p_idxgisurface: *mut dxgi::IDXGISurface = unsafe { std::mem::transmute(p_idxgisurface) };
+    unsafe { p_idxgisurface.as_ref() }.context("Null idxgisurface")
+}
+
+/// Acquire dxgi frame
+/// Re init d3d11 if desktop has been lost
+fn acquire_dxgi_frame() -> Result<(Vec<u8>, u32, u32, u32)> {
+    debug!("acquire img");
+    let idxgioutputduplication =
+        unsafe { P_OUTPUTDUPLICATION.load(atomic::Ordering::Acquire).as_ref() }
+            .context("Null outputduplication")?;
+
+    let mut frame_info = dxgi1_2::DXGI_OUTDUPL_FRAME_INFO::default();
+    let mut p_desktop_resource: *mut dxgi::IDXGIResource = null_mut();
+    let ret = unsafe {
+        idxgioutputduplication.AcquireNextFrame(
+            0,
+            &mut frame_info,
+            &mut p_desktop_resource as *mut _,
+        )
+    };
+    if !SUCCEEDED(ret) {
+        error!("acquirenextframe {:?}", ret);
+        let result = match ret {
+            DXGI_ERROR_ACCESS_LOST => {
+                // Re init d3d11
+                if let Err(err) = init_d3d11().context("Cannot init d3d11") {
+                    err.chain().for_each(|cause| error!(" - due to {}", cause));
+                }
+                Err(anyhow!("Access lost"))
+            }
+            DXGI_ERROR_WAIT_TIMEOUT => Err(anyhow!("wait timeout")),
+            err => Err(anyhow!(format!("Unknown err {:?}", err))),
+        };
+        return result;
+    }
+    debug!("frame acquired!");
+    let desktop_resource =
+        unsafe { p_desktop_resource.as_ref() }.context("p_desktop_resource is null")?;
+
+    let acquireddesktopimage =
+        d3d11_get_resource_texture2d(desktop_resource).context("Cannot get desktop resource")?;
+    let p_acquireddesktopimage: *mut d3d11::ID3D11Texture2D =
+        unsafe { std::mem::transmute(acquireddesktopimage) };
+
+    let p_id3d11texture2d = P_TEXTURE2D.load(atomic::Ordering::Acquire);
+
+    let p_copy_texture: *mut d3d11::ID3D11Texture2D =
+        unsafe { std::mem::transmute(p_id3d11texture2d) };
+
+    let p_copy_resource: *mut d3d11::ID3D11Resource =
+        unsafe { std::mem::transmute(p_copy_texture) };
+
+    let d3d11_device_context = unsafe {
+        P_DIRECT3D_DEVICE_CONTEXT
+            .load(atomic::Ordering::Acquire)
+            .as_ref()
+    }
+    .context("Device context null")?;
+
+    unsafe {
+        d3d11_device_context
+            .CopyResource(p_copy_resource as *mut _, p_acquireddesktopimage as *mut _)
+    };
+
+    let ret = unsafe { idxgioutputduplication.ReleaseFrame() };
+    if !SUCCEEDED(ret) {
+        panic!("cannot release frame");
+    }
+    debug!("Copy done");
+
+    let surface =
+        unsafe { P_SURFACE.load(atomic::Ordering::Acquire).as_ref() }.context("Null surface")?;
+
+    debug!("Surface ok");
+
+    let mut surface_desc = dxgi::DXGI_SURFACE_DESC::default();
+    let ret = unsafe { surface.GetDesc(&mut surface_desc) };
+    if !SUCCEEDED(ret) {
+        panic!("cannot desc surface");
+    }
+
+    debug!(
+        "surface {:?}x{:?} format {:?}",
+        surface_desc.Width, surface_desc.Height, surface_desc.Format,
+    );
+
+    let map = dxgi::DXGI_MAPPED_RECT {
+        Pitch: SURFACE_MAP_PITCH.load(atomic::Ordering::Acquire),
+        pBits: SURFACE_MAP_ADDR.load(atomic::Ordering::Acquire),
+    };
+
+    debug!("data {:?}", map.pBits);
+    let data = unsafe {
+        std::slice::from_raw_parts(
+            map.pBits as *mut u8,
+            (map.Pitch * surface_desc.Height as i32) as usize,
+        )
+    };
+    debug!("data {:?}", &data[0..10]);
+
+    let data = data.to_owned();
+
+    Ok((
+        data,
+        surface_desc.Width,
+        surface_desc.Height,
+        map.Pitch as u32,
+    ))
+}
+
+/// # Safety
+///
+/// Initialise Direct3D by calling unsafe Windows API
+pub fn init_d3d11() -> Result<()> {
+    let driver_types = vec![
+        d3dcommon::D3D_DRIVER_TYPE_HARDWARE,
+        d3dcommon::D3D_DRIVER_TYPE_WARP,
+        d3dcommon::D3D_DRIVER_TYPE_REFERENCE,
+    ];
+
+    let feature_levels = vec![
+        d3dcommon::D3D_FEATURE_LEVEL_11_0,
+        d3dcommon::D3D_FEATURE_LEVEL_10_1,
+        d3dcommon::D3D_FEATURE_LEVEL_10_0,
+        d3dcommon::D3D_FEATURE_LEVEL_9_1,
+    ];
+    let num_feature_levels = feature_levels.len() as u32;
+
+    let mut p_d3d11_device: *mut d3d11::ID3D11Device = null_mut();
+    let mut feature_level: d3dcommon::D3D_FEATURE_LEVEL = 0;
+    let mut p_d3d11_device_context: *mut d3d11::ID3D11DeviceContext = null_mut();
+
+    for driver_type in driver_types {
+        info!("Create D3D11 device for {}", driver_type);
+        let ret = unsafe {
+            d3d11::D3D11CreateDevice(
+                null_mut(),
+                driver_type,
+                null_mut(),
+                d3d11::D3D11_CREATE_DEVICE_BGRA_SUPPORT,
+                feature_levels.as_ptr() as *const _,
+                num_feature_levels,
+                d3d11::D3D11_SDK_VERSION,
+                &mut p_d3d11_device as *mut _,
+                &mut feature_level,
+                &mut p_d3d11_device_context as *mut _,
+            )
+        };
+        if !SUCCEEDED(ret) {
+            continue;
+        }
+        P_DIRECT3D_DEVICE.store(p_d3d11_device, atomic::Ordering::Release);
+        P_DIRECT3D_DEVICE_CONTEXT.store(p_d3d11_device_context, atomic::Ordering::Release);
+        let d3d11_device = unsafe { p_d3d11_device.as_ref() }.context("d3d11 device null")?;
+
+        info!("D3D11 device ok for {} {:?}", driver_type, ret);
+        info!(
+            "D3D11 {:?} {:?} {:?}",
+            p_d3d11_device, feature_level, p_d3d11_device_context
+        );
+        info!("known features level {:?}", feature_levels);
+
+        let idxgidevice =
+            d3d11_get_device_idxgidevice(d3d11_device).context("Cannot get idxgidevice")?;
+
+        let idxgiadapter =
+            d3d11_get_idxgidevice_idxgiadapter(idxgidevice).context("Cannot get idxgiadapter")?;
+
+        let mut index = 0;
+        let mut monitor_infos = vec![];
+        loop {
+            let mut p_idxgioutput: *mut dxgi::IDXGIOutput = null_mut();
+            let ret = unsafe { idxgiadapter.EnumOutputs(index, &mut p_idxgioutput as *mut _) };
+            index += 1;
+            if !SUCCEEDED(ret) {
+                break;
+            }
+            let idxgioutput = if let Some(idxgioutput) = unsafe { p_idxgioutput.as_ref() } {
+                idxgioutput
+            } else {
+                continue;
+            };
+
+            let mut desktopdesc = dxgi::DXGI_OUTPUT_DESC::default();
+            let ret = unsafe { idxgioutput.GetDesc(&mut desktopdesc as *mut _) };
+            if !SUCCEEDED(ret) {
+                continue;
+            }
+            monitor_infos.push(desktopdesc);
+            let idxgioutput1 = d3d11_get_idxgioutput_idxgioutput1(idxgioutput)
+                .context("Cannot get idxgioutput1")?;
+
+            let mut p_idxgioutputduplication: *mut dxgi1_2::IDXGIOutputDuplication = null_mut();
+
+            let ret = unsafe {
+                idxgioutput1.DuplicateOutput(
+                    p_d3d11_device as *mut _,
+                    &mut p_idxgioutputduplication as *mut _,
+                )
+            };
+            if !SUCCEEDED(ret) {
+                return Err(anyhow!("Cannot dup output"));
+            }
+            P_OUTPUTDUPLICATION.store(p_idxgioutputduplication, atomic::Ordering::Release);
+
+            let idxgioutputduplication = unsafe { p_idxgioutputduplication.as_ref() }
+                .context("Null idxgioutputduplication")?;
+
+            let mut output_desc = dxgi1_2::DXGI_OUTDUPL_DESC::default();
+            unsafe { idxgioutputduplication.GetDesc(&mut output_desc as *mut _) };
+            info!(
+                "mode desc {:?}x{:?} refreshrate {:?}/{:?} format {:?} scanlineorder {:?} scaling {:?}",
+                output_desc.ModeDesc.Width,
+                output_desc.ModeDesc.Height,
+                output_desc.ModeDesc.RefreshRate.Numerator,
+                output_desc.ModeDesc.RefreshRate.Denominator,
+                output_desc.ModeDesc.Format,
+                output_desc.ModeDesc.ScanlineOrdering,
+                output_desc.ModeDesc.Scaling,
+            );
+            info!("rotation {:?}", output_desc.Rotation);
+            info!(
+                "desktop in systemmem {:?}",
+                output_desc.DesktopImageInSystemMemory
+            );
+
+            let sample_desc = dxgitype::DXGI_SAMPLE_DESC {
+                Count: 1,
+                Quality: 0,
+            };
+
+            let desc = d3d11::D3D11_TEXTURE2D_DESC {
+                Width: output_desc.ModeDesc.Width,
+                Height: output_desc.ModeDesc.Height,
+                MipLevels: 1,
+                ArraySize: 1,
+                Format: output_desc.ModeDesc.Format,
+                SampleDesc: sample_desc,
+                Usage: d3d11::D3D11_USAGE_STAGING,
+                BindFlags: 0,
+                CPUAccessFlags: d3d11::D3D11_CPU_ACCESS_READ | d3d11::D3D11_CPU_ACCESS_WRITE,
+                MiscFlags: 0,
+            };
+
+            let mut p_id3d11texture2d: *mut d3d11::ID3D11Texture2D = null_mut();
+            let ret = unsafe {
+                d3d11_device.CreateTexture2D(&desc, null_mut(), &mut p_id3d11texture2d as *mut _)
+            };
+            if !SUCCEEDED(ret) {
+                return Err(anyhow!("Cannot create texture2d"));
+            }
+
+            P_TEXTURE2D.store(p_id3d11texture2d, atomic::Ordering::Release);
+
+            let id3d11texture2d =
+                unsafe { p_id3d11texture2d.as_ref() }.context("p_desktop_resource is null")?;
+
+            let idxgisurface = d3d11_get_texture2d_surface(id3d11texture2d)
+                .context("Cannot get surface interface")?;
+
+            let p_idxgisurface: *mut dxgi::IDXGISurface =
+                unsafe { std::mem::transmute(idxgisurface) };
+
+            P_SURFACE.store(p_idxgisurface, atomic::Ordering::Release);
+            let surface = unsafe { p_idxgisurface.as_ref() }.context("Null idxgisurface")?;
+
+            let mut map = dxgi::DXGI_MAPPED_RECT::default();
+            let ret = unsafe { surface.Map(&mut map, dxgi::DXGI_MAP_READ) };
+            if !SUCCEEDED(ret) {
+                panic!("cannot map surface");
+            }
+            SURFACE_MAP_ADDR.store(map.pBits, atomic::Ordering::Release);
+            SURFACE_MAP_PITCH.store(map.Pitch, atomic::Ordering::Release);
+
+            return Ok(());
+        }
+        for monitor in monitor_infos {
+            info!("Monitor!");
+            info!(
+                "Info name {:?} coord {:?} AttachedToDesktop {:?} Rotation {:?} Monitor {:?}",
+                monitor.DeviceName,
+                monitor.DesktopCoordinates,
+                monitor.AttachedToDesktop,
+                monitor.Rotation,
+                monitor.Monitor,
+            );
+        }
+
+        break;
+    }
+
+    Err(anyhow!("Cannot create d3d11 device"))
+}
+
 pub fn init_win(
     _arguments: &ArgumentsSrv,
     config: &ConfigServer,
@@ -176,11 +619,11 @@ pub fn init_win(
                 0,
                 wc.lpszClassName,
                 window_name_ptr,
-                WS_VISIBLE | WS_POPUP | WS_DLGFRAME | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
+                WS_POPUP | WS_DLGFRAME | WS_CLIPSIBLINGS | WS_CLIPCHILDREN,
                 0,
                 0,
-                100,
-                100,
+                10,
+                10,
                 null_mut(),
                 null_mut(),
                 instance_handle,
@@ -208,7 +651,7 @@ pub fn init_win(
             sleep(Duration::from_millis(5));
         }
     });
-
+    init_d3d11().context("Cannot init d3d11")?;
     let server = ServerInfo {
         img: None,
         max_stall_img: config.video.max_stall_img,
@@ -227,83 +670,27 @@ impl Server for ServerInfo {
     }
 
     fn grab_frame(&mut self) -> Result<()> {
-        unsafe {
-            let time_start = Instant::now();
-
-            let hdc_source = GetDC(null_mut());
-            let hdc_memory = CreateCompatibleDC(hdc_source);
-            let cap_x = GetDeviceCaps(hdc_source, HORZRES);
-            let cap_y = GetDeviceCaps(hdc_source, VERTRES);
-
-            let h_bitmap = CreateCompatibleBitmap(hdc_source, cap_x, cap_y);
-            let _h_bitmap_old = SelectObject(hdc_memory, h_bitmap as *mut c_void);
-
-            let time_getdc = Instant::now();
-
-            BitBlt(hdc_memory, 0, 0, cap_x, cap_y, hdc_source, 0, 0, SRCCOPY);
-
-            let time_bitblt = Instant::now();
-
-            let mut bitmap_0 = BITMAP::default();
-            let ptr = &mut bitmap_0;
-            GetObjectA(
-                h_bitmap as *mut c_void,
-                std::mem::size_of::<BITMAP>() as i32,
-                std::mem::transmute(ptr),
-            );
-            debug!("obk {:?} {:?}", bitmap_0.bmWidth, bitmap_0.bmHeight);
-
-            let mut bi = BITMAPINFOHEADER {
-                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                biWidth: bitmap_0.bmWidth,
-                biHeight: bitmap_0.bmHeight,
-                biPlanes: 1,
-                biBitCount: 32,
-                biCompression: BI_RGB,
-                biSizeImage: 0,
-                biXPelsPerMeter: 0,
-                biYPelsPerMeter: 0,
-                biClrImportant: 0,
-                biClrUsed: 256,
-            };
-
-            let dw_bm_bits_size =
-                ((bitmap_0.bmWidth * bi.biBitCount as i32 + 31) & !31) / 8 * bitmap_0.bmHeight;
-            let mut data = vec![0u8; dw_bm_bits_size as usize];
-            let data_ptr = data.as_mut_ptr();
-
-            let bi_ptr = &mut bi;
-            GetDIBits(
-                hdc_source,
-                h_bitmap,
-                0,
-                bitmap_0.bmHeight as u32,
-                data_ptr as *mut c_void,
-                std::mem::transmute(bi_ptr),
-                DIB_RGB_COLORS,
-            );
-            let time_stop = Instant::now();
-            debug!(
-                "grab time: {:?} {:?} {:?}",
-                time_stop - time_bitblt,
-                time_bitblt - time_getdc,
-                time_getdc - time_start
-            );
-
-            // invert image
-            let mut data_inverted = vec![0u8; data.len()];
-            for i in 0..bitmap_0.bmHeight as usize {
-                let index = bitmap_0.bmWidth as usize * 4;
-                let j = bitmap_0.bmHeight as usize - i - 1;
-                data_inverted[i * index..(i + 1) * index]
-                    .copy_from_slice(&data[j * index..(j + 1) * index]);
+        let time_ac1 = Instant::now();
+        let (data, width, height, pitch) = match acquire_dxgi_frame() {
+            Err(err) => {
+                err.chain().for_each(|cause| error!(" - due to {}", cause));
+                return Ok(());
             }
-            self.img = Some(data_inverted);
-            drop(data);
-            DeleteDC(hdc_source);
-            DeleteDC(hdc_memory);
+            Ok(x) => x,
         };
+        let time_ac2 = Instant::now();
+        info!("duration: {:?}", time_ac2 - time_ac1);
 
+        // invert image
+        debug!("img {}x{} {}", width, height, pitch);
+        let mut data_sized = vec![0u8; data.len()];
+        let bpp = (width * 4) as usize;
+        for index in 0..height as usize {
+            data_sized[index * bpp..index * bpp + bpp]
+                .copy_from_slice(&data[index * pitch as usize..index * pitch as usize + bpp]);
+        }
+        self.img = Some(data_sized);
+        drop(data);
         Ok(())
     }
 
@@ -424,6 +811,13 @@ impl Server for ServerInfo {
                 Some(tunnel::message_client::Msg::Display(event)) => {
                     server_events.push(ServerEvent::ResolutionChange(event.width, event.height));
                 }
+                Some(tunnel::message_client::Msg::Clipboard(event)) => {
+                    info!("Clipboard retrieved from client");
+                    set_clipboard(formats::Unicode, event.data.clone())
+                        .map_err(|err| anyhow!("Err {:?}", err))
+                        .context("Cannot set clipboard")?;
+                }
+
                 _ => {}
             }
         }
@@ -484,7 +878,7 @@ impl Server for ServerInfo {
         _width: u32,
         _height: u32,
     ) -> Result<()> {
-        error!("Unsupported os");
+        error!("Change resolution: unsupported os");
         Ok(())
     }
 

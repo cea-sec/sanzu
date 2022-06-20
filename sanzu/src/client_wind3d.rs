@@ -456,7 +456,7 @@ pub unsafe fn render(
     ret
 }
 
-pub extern "system" fn custom_wnd_proc_sub(
+extern "system" fn custom_wnd_proc_sub(
     hwnd: HWND,
     msg: UINT,
     wparam: WPARAM,
@@ -502,7 +502,7 @@ pub extern "system" fn custom_wnd_proc_sub(
     unsafe { DefWindowProcA(hwnd, msg, wparam, lparam) }
 }
 
-pub extern "system" fn custom_wnd_proc(
+extern "system" fn custom_wnd_proc(
     hwnd: HWND,
     msg: UINT,
     wparam: WPARAM,
