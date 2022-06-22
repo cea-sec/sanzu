@@ -27,6 +27,12 @@ pub fn init_video_codec<'a>(
     codec_options: Option<impl Iterator<Item = (&'a String, &'a String)>>,
     name: &str,
 ) -> Result<Box<dyn Decoder>> {
+    // Set log level to FATAL if building release
+    #[cfg(not(debug_assertions))]
+    unsafe {
+        ffmpeg::av_log_set_level(ffmpeg::AV_LOG_FATAL);
+    }
+
     let decoder: Box<dyn Decoder> = match name {
         "null" => Box::new(DecoderNull {
             data_rgb: None,
