@@ -100,9 +100,9 @@ assets = [
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/sanzu_server", dest = "/usr/bin/", mode = "0755" },
-    { source = "target/release/sanzu_client", dest = "/usr/bin/", mode = "0755" },
-    { source = "target/release/sanzu_proxy", dest = "/usr/bin/", mode = "0755" },
+    { source = "target/release/sanzu_server", dest = "/usr/bin/sanzu_server", mode = "0755" },
+    { source = "target/release/sanzu_client", dest = "/usr/bin/sanzu_client", mode = "0755" },
+    { source = "target/release/sanzu_proxy", dest = "/usr/bin/sanzu_proxy", mode = "0755" },
     { source = "sanzu.toml", dest = "/etc/sanzu.toml", mode = "0644", conf = true },
     { source = "README.md", dest = "/usr/share/doc/sanzu/README", mode = "0644", doc = true },
 ]

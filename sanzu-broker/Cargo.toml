@@ -47,7 +47,7 @@ conf-files = ["/etc/sanzu_broker.toml"]
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/sanzu_broker", dest = "/usr/bin/", mode = "755" },
+    { source = "target/release/sanzu_broker", dest = "/usr/bin/sanzu_broker", mode = "755" },
     { source = "sanzu_broker.toml", dest = "/etc/sanzu_broker.toml", mode = "644", config = true },
     { source = "README.md", dest = "/usr/share/doc/sanzu_broker/README", mode = "644", doc = true },
 ]
