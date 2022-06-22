@@ -63,7 +63,7 @@ sanzu_client 127.0.0.1 1337 --proxycommand "ssh rochefort DISPLAY=:1234 sanzu_se
 In this case the connection is done throught ssh so ip and port are useless. The server must have the configuration file "/etc/sanzu.toml" present or specified with the "--config" flag.
 
 
-## Client compilation
+## Compilation
 ### Debian
 Packages required:
 
@@ -89,15 +89,33 @@ Required packages:
 yum install alsa-lib-devel ffmpeg-devel compat-libxcb
 ```
 
-### Windows cross compilation
-Allow cargo to cross compile:
+### Windows cross compilation from archlinux
+You can follow the steps described in the Docker file in `build/Dockerfile-windows`
+
+### Windows binaries compilation from windows
+Compilation example is shown in the github action. To reproduce those steps:
+- install classic development environment installed on your windows system (visual studio, ...)
+- install the Vcpkg package
+- prepare vcpkg:
 ```
-export PKG_CONFIG_ALLOW_CROSS=1
+vcpkg integrate install
 ```
-Build with pc-windows-gnu toolchain:
+- install ffmpeg package
 ```
-build --release  --target "x86_64-pc-windows-gnu"
+vcpkg install ffmpeg:x64-windows
 ```
+- run cargo on the sanzu workspace:
+```
+cargo build --release -p sanzu --no-default-features
+```
+
+## Launching binaries on windows
+- Download the ffmpeg binaries library from official repositories
+- either from https://github.com/BtbN/FFmpeg-Builds/releases file ffmpeg-n4.4-latest-win64-gpl-shared-4.4.zip
+- or from https://www.gyan.dev/ffmpeg/builds/ file ffmpeg-4.4.1-full_build-shared.7z
+- decompress
+- copy `sanzu_client`or `sanzu_server` in the `bin` sub folder of the ffmpeg decompressed folder
+- execute client or server using previously described commands
 
 ## Testing with TLS
 Generate CA / server / client certificates (for test purposes, you can use gen_ca_and_certs.sh)
