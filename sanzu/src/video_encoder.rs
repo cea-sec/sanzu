@@ -605,6 +605,11 @@ pub fn init_video_encoder<'a>(
     command_options: &Option<String>,
     size: (u16, u16),
 ) -> Result<Box<dyn Encoder>> {
+    // Set log level to FATAL if building release
+    #[cfg(not(debug_assertions))]
+    unsafe {
+        ffmpeg::av_log_set_level(ffmpeg::AV_LOG_FATAL);
+    }
     let encoder: Box<dyn Encoder> = match name {
         "null" => Box::new(EncoderNull::new()),
         name => {
