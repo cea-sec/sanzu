@@ -28,7 +28,11 @@ serde_derive = "1.0"
 toml = "0.5"
 uuid = { version = "1.1", features = ["serde", "v4"] }
 x509-parser = "0.13.2"
-libgssapi = "0.6.2"
+libgssapi = {version = "0.6.2", optional = true}
+
+[features]
+kerberos = ["sanzu-common/kerberos"]
+default = ["kerberos"]
 
 [package.metadata.deb]
 name = "sanzu-broker"

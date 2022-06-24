@@ -48,14 +48,14 @@ cpufeatures = "0.2.1"
 [features]
 notify = ["notify-rust", "dbus", "dbus-crossroads"]
 printfile = ["notify-rust", "dbus", "dbus-crossroads"]
-kerberos = ["libgssapi", "sanzu-common/kerberos"]
+kerberos = ["sanzu-common/kerberos"]
 default = ["kerberos"]
+
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "4.4.1"
 ico = "0.1.0"
 tempfile = "3.3.0"
-windows_bindings = {path = "windows_bindings"}
 winapi = { version = "0.3.9", features = [
   "impl-default", "winuser", "wingdi", "winbase", "libloaderapi", "processthreadsapi",
   "errhandlingapi", "winerror", "commctrl", "sysinfoapi", "shobjidl", "combaseapi",

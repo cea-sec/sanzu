@@ -26,7 +26,7 @@ use sanzu_common::{
 };
 
 #[cfg(all(unix, feature = "kerberos"))]
-use sanzu_common::{auth_kerberos::do_kerberos_auth, proto::*};
+use sanzu_common::{auth_kerberos::do_kerberos_client_auth, proto::*};
 
 use rustls::ServerConnection;
 
@@ -110,10 +110,9 @@ fn auth_client(
         match auth_type {
             #[cfg(all(unix, feature = "kerberos"))]
             AuthType::Kerberos(realms) => {
-                let username = do_kerberos_auth(&realms, &mut conn)?;
-                info!("Kerberos authentication ok for user: {}", username);
-                username = Some(username);
-                if tls_username.is_some() && tls_username != username {
+                let krb_username = do_kerberos_client_auth(realms, &mut conn)?;
+                info!("Kerberos authentication ok for user: {}", krb_username);
+                if username.is_some() && username != Some(krb_username) {
                     return Err(send_server_err_event(
                         &mut conn,
                         anyhow!("Username mismatch between tls and kerberos"),

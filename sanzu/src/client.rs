@@ -19,7 +19,7 @@ use sanzu_common::{
 };
 
 #[cfg(feature = "kerberos")]
-use crate::auth_kerberos::perform_auth;
+use sanzu_common::auth_kerberos::do_kerberos_server_auth;
 
 use crate::{
     client_graphics::*,
@@ -169,7 +169,7 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
 
     #[cfg(feature = "kerberos")]
     if let Some(cname) = arguments.server_cname {
-        perform_auth(cname, server)
+        do_kerberos_server_auth(cname, server)
             .context("Error in perform_auth")
             .map_err(|err| send_client_err_event(server, err))?
     }

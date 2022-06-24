@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 
 #[cfg(all(unix, feature = "kerberos"))]
-use sanzu_common::auth_kerberos::do_kerberos_auth;
+use sanzu_common::auth_kerberos::do_kerberos_client_auth;
 #[cfg(target_family = "unix")]
 use sanzu_common::auth_pam::do_pam_auth;
 #[cfg(target_family = "unix")]
@@ -29,7 +29,7 @@ use std::{
 #[cfg(unix)]
 use vsock;
 
-#[cfg(any(target_family = "unix", feature = "kerberos"))]
+#[cfg(target_family = "unix")]
 use crate::config::AuthType;
 use crate::{
     config::{ConfigServer, ConfigTls},
@@ -205,7 +205,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
     #[cfg(windows)]
     info!("Tls state: {}", has_tls);
 
-    #[cfg(any(target_family = "unix", feature = "kerberos"))]
+    #[cfg(target_family = "unix")]
     if let Some(auth_type) = &config.auth_type {
         match auth_type {
             #[cfg(all(unix, feature = "kerberos"))]
@@ -214,7 +214,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
                     warn!("Kerberos allowed realms list is empty");
                 }
 
-                let username = do_kerberos_auth(realms, &mut sock)?;
+                let username = do_kerberos_client_auth(realms, &mut sock)?;
                 info!("Kerberos authentication ok for user: {}", username);
             }
             #[cfg(target_family = "unix")]
