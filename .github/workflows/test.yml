@@ -99,16 +99,16 @@ jobs:
         command: build
         args: --release --verbose -p sanzu --no-default-features
 
-    - name: Upload resulting 'sanzu_client'
+    - name: Upload resulting 'sanzu_client.exe'
       uses: actions/upload-artifact@v1
       with:
-        name: sanzu_client
+        name: sanzu_client.exe
         path: ./target/release/sanzu_client.exe
 
-    - name: Upload resulting 'sanzu_server'
+    - name: Upload resulting 'sanzu_server.exe'
       uses: actions/upload-artifact@v1
       with:
-        name: sanzu_client
+        name: sanzu_server.exe
         path: ./target/release/sanzu_server.exe
   fmt:
     runs-on: ubuntu-latest
