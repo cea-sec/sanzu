@@ -112,11 +112,13 @@ fn auth_client(
             AuthType::Kerberos(realms) => {
                 let krb_username = do_kerberos_client_auth(realms, &mut conn)?;
                 info!("Kerberos authentication ok for user: {}", krb_username);
-                if username.is_some() && username != Some(krb_username) {
+                if username.is_some() && username != Some(krb_username.to_owned()) {
                     return Err(send_server_err_event(
                         &mut conn,
                         anyhow!("Username mismatch between tls and kerberos"),
                     ));
+                } else {
+                    username = Some(krb_username);
                 }
             }
             AuthType::Pam(pam_name) => {
