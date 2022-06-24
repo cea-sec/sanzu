@@ -10,4 +10,6 @@ pub use proto::{tunnel, ReadWrite, Stdio, Tunnel};
 pub mod auth_kerberos;
 #[cfg(target_family = "unix")]
 pub mod auth_pam;
+#[cfg(all(windows, feature = "kerberos"))]
+pub mod sspi;
 pub mod tls_helper;

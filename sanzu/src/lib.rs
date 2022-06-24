@@ -11,8 +11,6 @@ extern crate anyhow;
 #[macro_use]
 extern crate sanzu_common;
 
-#[cfg(feature = "kerberos")]
-pub mod auth_kerberos;
 pub mod client;
 pub mod client_utils;
 #[cfg(windows)]
@@ -47,8 +45,6 @@ pub mod server_x11;
 pub use proxy_windows as proxy;
 pub mod osd;
 pub mod sound;
-#[cfg(windows)]
-pub mod sspi;
 pub mod video_decoder;
 pub mod video_encoder;
 pub mod yuv_rgb_rs;
