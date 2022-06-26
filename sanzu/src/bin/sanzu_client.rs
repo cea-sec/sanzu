@@ -213,7 +213,11 @@ Ex: -j c:\user\dupond\printdir\
         proxycommand,
     };
 
-    if let Err(err) = client::run(&client_config, &arguments) {
+    if let Err(err) = client::run(
+        &client_config,
+        &arguments,
+        client::StdioClientInterface::default(),
+    ) {
         error!("Client error");
         err.chain().for_each(|cause| error!(" - due to {}", cause));
     }
