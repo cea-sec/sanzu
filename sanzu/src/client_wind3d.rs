@@ -924,7 +924,7 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
         }
         Ordering::Greater => {
             let mut data = cursor_bgra.to_owned();
-            data.append(&mut vec![0u8; ((width - height) * 4) as usize]);
+            data.append(&mut vec![0u8; (width * (width - height) * 4) as usize]);
             (data, width, width)
         }
         Ordering::Equal => (cursor_bgra.to_owned(), width, height),
