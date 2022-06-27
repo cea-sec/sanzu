@@ -166,3 +166,4 @@ Those options can be retrieved from the FFmpeg command line:
 
 ## Known issues
 - If connection is flappy, keyboard events might be sent with a delay. Consequence is identical to sticky keys, with input repetition.
+- If you are using an X11 server and you have keyboard layout issues, you might need to explicitly set your keyboard layout by using [setxkbmap](https://linux.die.net/man/1/setxkbmap) on the server.
