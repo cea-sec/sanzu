@@ -9,7 +9,6 @@ use libgssapi::{
     oid::{OidSet, GSS_MECH_KRB5, GSS_NT_HOSTBASED_SERVICE},
 };
 
-#[cfg(unix)]
 use crate::proto::*;
 
 #[cfg(unix)]
@@ -39,6 +38,7 @@ fn setup_client_ctx(service_name: Name, desired_mechs: &OidSet) -> Result<Client
 }
 
 #[cfg(unix)]
+/// Actually authenticate the server to the client. Using libgssapi.
 pub fn do_kerberos_client_auth(
     allowed_realms: &[String],
     sock: &mut dyn ReadWrite,
@@ -75,8 +75,7 @@ pub fn do_kerberos_client_auth(
         .flags()
         .context("Error in server ctx")
         .map_err(|err| send_server_err_event(sock, err))?;
-    let required_flags =
-        CtxFlags::GSS_C_MUTUAL_FLAG | CtxFlags::GSS_C_CONF_FLAG | CtxFlags::GSS_C_INTEG_FLAG;
+    let required_flags = CtxFlags::GSS_C_MUTUAL_FLAG | CtxFlags::GSS_C_INTEG_FLAG;
     if flags & required_flags != required_flags {
         return Err(anyhow!("Kerberos flags not compliant"))
             .map_err(|err| send_server_err_event(sock, err));
@@ -114,19 +113,20 @@ pub fn do_kerberos_server_auth(target_name: &str, server: &mut dyn ReadWrite) ->
         match client_ctx.step(server_tok.as_deref(), None)? {
             None => {
                 let client_token = tunnel::EventKerberos { data: vec![] };
-                Tunnel::send(server, client_token).context("Error in send EventKerberos")?;
+                send_client_msg_type!(server, client_token, Kerberos)
+                    .context("Error in send EventKerberos")?;
                 break;
             }
             Some(client_tok) => {
                 let client_token = tunnel::EventKerberos {
                     data: client_tok.to_vec(),
                 };
-                Tunnel::send(server, client_token).context("Error in send EventKerberos")?;
+                send_client_msg_type!(server, client_token, Kerberos)
+                    .context("Error in send EventKerberos")?;
             }
         }
 
-        let msg: tunnel::EventKerberos =
-            Tunnel::recv(server).context("Error in recv EventKerberos")?;
+        let msg = recv_client_msg_type!(server, Kerberos).context("Error in recv EventKerberos")?;
         let server_token = msg.data;
         if server_token.is_empty() {
             break;
@@ -137,10 +137,10 @@ pub fn do_kerberos_server_auth(target_name: &str, server: &mut dyn ReadWrite) ->
     info!("Security context initialized successfully");
     debug!("client ctx info: {:#?}", client_ctx.info()?);
     let flags = client_ctx.flags().context("Error in client ctx flags")?;
-    let required_flags =
-        CtxFlags::GSS_C_MUTUAL_FLAG | CtxFlags::GSS_C_CONF_FLAG | CtxFlags::GSS_C_INTEG_FLAG;
+    let required_flags = CtxFlags::GSS_C_MUTUAL_FLAG | CtxFlags::GSS_C_INTEG_FLAG;
     if flags & required_flags != required_flags {
-        return Err(anyhow!("Flags not compliant"));
+        return Err(anyhow!("Kerberos flags not compliant"))
+            .map_err(|err| send_client_err_event(server, err));
     }
     Ok(())
 }
@@ -165,15 +165,19 @@ pub fn do_kerberos_server_auth(target_name: &str, server: &mut dyn ReadWrite) ->
     debug!("client_token = {:?}", &client_token);
 
     // Send it
-    Tunnel::send(server, tunnel::EventKerberos { data: client_token })
-        .context("Error in send EventKerberos")?;
+    send_client_msg_type!(
+        server,
+        tunnel::EventKerberos { data: client_token },
+        Kerberos
+    )
+    .context("Error in send EventKerberos")?;
 
     while security_status == sspi::SspiStatus::ContinueNeeded
         || security_status == sspi::SspiStatus::CompleteAndContinue
     {
         // Get response
-        let response: tunnel::EventKerberos =
-            Tunnel::recv(server).context("Error in recv EventKerberos")?;
+        let response =
+            recv_client_msg_type!(server, Kerberos).context("Error in recv EventKerberos")?;
         let mut server_token = response.data;
         debug!("server_token = {:?}", &server_token);
         if server_token.is_empty() {
@@ -199,8 +203,12 @@ pub fn do_kerberos_server_auth(target_name: &str, server: &mut dyn ReadWrite) ->
         debug!("client_token = {:?}", client_token);
 
         // Send it
-        Tunnel::send(server, tunnel::EventKerberos { data: client_token })
-            .context("Error in send EventKerberos")?;
+        send_client_msg_type!(
+            server,
+            tunnel::EventKerberos { data: client_token },
+            Kerberos
+        )
+        .context("Error in send EventKerberos")?;
     }
 
     info!("Security context initialized successfully");
