@@ -33,6 +33,10 @@ pub fn init_video_codec<'a>(
         ffmpeg::av_log_set_level(ffmpeg::AV_LOG_FATAL);
     }
 
+    unsafe {
+        ffmpeg::av_register_all();
+    }
+
     let decoder: Box<dyn Decoder> = match name {
         "null" => Box::new(DecoderNull {
             data_rgb: None,

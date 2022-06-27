@@ -611,6 +611,11 @@ pub fn init_video_encoder<'a>(
     unsafe {
         ffmpeg::av_log_set_level(ffmpeg::AV_LOG_FATAL);
     }
+
+    unsafe {
+        ffmpeg::av_register_all();
+    }
+
     let encoder: Box<dyn Encoder> = match name {
         "null" => Box::new(EncoderNull::new()),
         name => {
