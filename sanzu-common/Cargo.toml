@@ -30,4 +30,4 @@ winapi = { version = "0.3.9" }
 
 [target.'cfg(unix)'.dependencies]
 libgssapi = {version = "0.6.2", optional = true}
-pam = {git = "https://github.com/1wilkens/pam.git", rev="1c38df0660ade4f6db878a0ed6952c05d88f721f"}
+pam = {git = "https://github.com/serpilliere/pam.git", branch="fix_env_parsing"}
