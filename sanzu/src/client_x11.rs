@@ -178,14 +178,18 @@ fn setup_window<C: Connection>(
     .context("Error in create_window")?;
 
     let title = "Surf client";
-    conn.change_property8(
-        PropMode::REPLACE,
-        win_id,
-        AtomEnum::WM_NAME,
-        AtomEnum::STRING,
-        title.as_bytes(),
-    )
-    .context("Error in change_property8")?;
+    if let Err(err) = conn
+        .change_property8(
+            PropMode::REPLACE,
+            win_id,
+            AtomEnum::WM_NAME,
+            AtomEnum::STRING,
+            title.as_bytes(),
+        )
+        .context("Error on change window name")
+    {
+        err.chain().for_each(|cause| error!(" - due to {}", cause));
+    }
 
     if !arguments.window_mode {
         let wm_state = conn
@@ -202,16 +206,21 @@ fn setup_window<C: Connection>(
             .context("Error in intern_atom reply")?
             .atom;
 
-        conn.change_property32(
-            PropMode::REPLACE,
-            win_id,
-            wm_state,
-            AtomEnum::ATOM,
-            &[wm_full],
-        )
-        .context("Error in change_property32")?
-        .check()
-        .context("Error in change_property32 check")?;
+        if let Err(err) = conn
+            .change_property32(
+                PropMode::REPLACE,
+                win_id,
+                wm_state,
+                AtomEnum::ATOM,
+                &[wm_full],
+            )
+            .context("Error in change_property32")
+            .map(|reply| reply.check())
+            .context("Error in change_property32 check")
+        {
+            error!("Change full screen error");
+            err.chain().for_each(|cause| error!(" - due to {}", cause));
+        }
     }
 
     conn.map_window(win_id)
