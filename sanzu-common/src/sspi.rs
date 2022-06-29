@@ -1,21 +1,22 @@
-use core::ffi::c_void;
+use anyhow::{Context, Result};
 
-use windows_bindings::Windows::Win32::{
-    Foundation::{
-        PWSTR, SEC_E_OK, SEC_I_COMPLETE_AND_CONTINUE, SEC_I_COMPLETE_NEEDED, SEC_I_CONTINUE_NEEDED,
-    },
-    Security::{
-        Authentication::Identity::Core::{
-            AcquireCredentialsHandleW, CompleteAuthToken, FreeContextBuffer,
-            InitializeSecurityContextW, SecBuffer, SecBufferDesc, ISC_REQ_ALLOCATE_MEMORY,
-            ISC_REQ_INTEGRITY, ISC_REQ_MUTUAL_AUTH, ISC_RET_ALLOCATED_MEMORY, ISC_RET_INTEGRITY,
-            ISC_RET_MUTUAL_AUTH, SECBUFFER_TOKEN, SECBUFFER_VERSION, SECPKG_CRED_OUTBOUND,
-            SECURITY_NATIVE_DREP,
+use winapi::{
+    ctypes::c_void,
+    shared::{
+        ntdef::LARGE_INTEGER,
+        sspi::{
+            AcquireCredentialsHandleA, CompleteAuthToken, FreeContextBuffer,
+            InitializeSecurityContextW, SecBuffer, SecBufferDesc, SecHandle,
+            ISC_REQ_ALLOCATE_MEMORY, ISC_REQ_INTEGRITY, ISC_REQ_MUTUAL_AUTH,
+            ISC_RET_ALLOCATED_MEMORY, ISC_RET_INTEGRITY, ISC_RET_MUTUAL_AUTH, SECBUFFER_TOKEN,
+            SECBUFFER_VERSION, SECPKG_CRED_OUTBOUND, SECURITY_NATIVE_DREP,
         },
-        Credentials::SecHandle,
+        winerror::{
+            HRESULT, SEC_E_OK, SEC_I_COMPLETE_AND_CONTINUE, SEC_I_COMPLETE_NEEDED,
+            SEC_I_CONTINUE_NEEDED,
+        },
     },
 };
-use windows_bindings::HRESULT;
 
 #[derive(Debug, PartialEq)]
 pub enum SspiStatus {
@@ -26,38 +27,25 @@ pub enum SspiStatus {
     Other(String),
 }
 
-#[derive(Debug)]
-pub struct SspiError(String);
-
-impl std::error::Error for SspiError {}
-
-impl std::fmt::Display for SspiError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
-
-pub type Result = std::result::Result<SspiStatus, SspiError>;
-
-fn u32_to_result(code: u32) -> Result {
-    let hresult = HRESULT(code);
-    if hresult.is_err() {
-        return Err(SspiError(hresult.message()));
+fn u32_to_result(code: u32) -> Result<SspiStatus> {
+    let hresult = code as HRESULT;
+    if hresult < 0 {
+        return Err(anyhow!(format!("Sspi error: {:x}", hresult)));
     }
     match hresult {
         SEC_E_OK => Ok(SspiStatus::Ok),
         SEC_I_COMPLETE_AND_CONTINUE => Ok(SspiStatus::CompleteAndContinue),
         SEC_I_COMPLETE_NEEDED => Ok(SspiStatus::CompleteNeeded),
         SEC_I_CONTINUE_NEEDED => Ok(SspiStatus::ContinueNeeded),
-        _ => Ok(SspiStatus::Other(hresult.message())),
+        _ => Ok(SspiStatus::Other("Sspi unknown status".to_string())),
     }
 }
 
-fn secbuffers_to_token(secbuffers: Vec<SecBuffer>) -> Vec<u8> {
+fn secbuffers_to_token(secbuffers: Vec<SecBuffer>) -> Result<Vec<u8>> {
     let bufftoken = secbuffers
         .iter()
         .find(|x| x.BufferType == SECBUFFER_TOKEN as u32)
-        .expect("Unable to find a buffer with Token type.");
+        .context("Unable to find a buffer with Token type.")?;
 
     let tok: Vec<u8> = unsafe {
         std::slice::from_raw_parts(bufftoken.pvBuffer as *const _, bufftoken.cbBuffer as usize)
@@ -66,7 +54,7 @@ fn secbuffers_to_token(secbuffers: Vec<SecBuffer>) -> Vec<u8> {
     unsafe {
         FreeContextBuffer(bufftoken.pvBuffer);
     }
-    tok
+    Ok(tok)
 }
 
 pub struct SecurityPackage {
@@ -86,24 +74,32 @@ impl SecurityPackage {
         }
     }
 
-    pub fn acquire_credentials_handle_w(&mut self) -> Result {
+    pub fn acquire_credentials_handle_w(&mut self) -> Result<SspiStatus> {
         u32_to_result(unsafe {
-            let mut _timestamp: i64 = 0;
-            AcquireCredentialsHandleW(
-                PWSTR::NULL,               // 1:pszprincipal
-                self.packagename.as_str(), // 2:pszpackage
-                SECPKG_CRED_OUTBOUND,      // 3:fcredentialuse
-                std::ptr::null_mut(),      // 4:pvlogonid
-                std::ptr::null_mut(),      // 5:pauthdata
-                None,                      // 6:pgetkeyfn
-                std::ptr::null_mut(),      // 7:pvgetkeyargument
-                &mut self.creds,           // 8:phcredential
-                &mut _timestamp,           // 9:ptsexpiry
-            ) as u32
+            let mut _timestamp = LARGE_INTEGER::default();
+            let mut packagename_vec = self
+                .packagename
+                .as_bytes()
+                .iter()
+                .map(|&byte| byte as i8)
+                .collect::<Vec<i8>>();
+            let ret = AcquireCredentialsHandleA(
+                std::ptr::null_mut(),         // 1:pszprincipal
+                packagename_vec.as_mut_ptr(), // 2:pszpackage
+                SECPKG_CRED_OUTBOUND,         // 3:fcredentialuse
+                std::ptr::null_mut(),         // 4:pvlogonid
+                std::ptr::null_mut(),         // 5:pauthdata
+                None,                         // 6:pgetkeyfn
+                std::ptr::null_mut(),         // 7:pvgetkeyargument
+                &mut self.creds,              // 8:phcredential
+                &mut _timestamp,              // 9:ptsexpiry
+            ) as u32;
+            drop(packagename_vec);
+            ret
         })
     }
 
-    pub fn initialize_security_context_w(&mut self, token: &mut Vec<u8>) -> Result {
+    pub fn initialize_security_context_w(&mut self, token: &mut Vec<u8>) -> Result<SspiStatus> {
         let creds_ptr: *mut SecHandle = &mut self.creds;
         let mut targetname_utf16 = self
             .targetname
@@ -148,7 +144,7 @@ impl SecurityPackage {
         let mut ret_flags: u32 = 0;
 
         let result = unsafe {
-            let mut _timestamp: i64 = 0;
+            let mut _timestamp = LARGE_INTEGER::default();
             InitializeSecurityContextW(
                 creds_ptr,                           // 1:phcredential
                 old_ctxt,                            // 2:phcontext
@@ -177,11 +173,12 @@ impl SecurityPackage {
         drop(targetname_utf16);
         drop(in_secbuffers);
 
-        *token = secbuffers_to_token(out_secbuffers);
+        *token = secbuffers_to_token(out_secbuffers).context("Error in secbuffers to token")?;
+
         u32_to_result(result)
     }
 
-    pub fn complete_auth_token(&mut self, token: &mut Vec<u8>) -> Result {
+    pub fn complete_auth_token(&mut self, token: &mut Vec<u8>) -> Result<SspiStatus> {
         let mut secbuffers = vec![SecBuffer {
             BufferType: SECBUFFER_TOKEN as u32,
             cbBuffer: token.len() as u32,
@@ -200,7 +197,8 @@ impl SecurityPackage {
         };
         let result = unsafe { CompleteAuthToken(ctxt, secbufferdesc_ptr) as u32 };
 
-        *token = secbuffers_to_token(secbuffers);
+        *token = secbuffers_to_token(secbuffers).context("Error in secbuffers to token")?;
+
         u32_to_result(result)
     }
 }

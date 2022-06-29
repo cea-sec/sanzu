@@ -25,7 +25,7 @@ kerberos = ["libgssapi"]
 default = []
 
 [target.'cfg(windows)'.dependencies]
-windows_bindings = {path = "windows_bindings"}
+winapi = { version = "0.3.9" }
 
 
 [target.'cfg(unix)'.dependencies]
