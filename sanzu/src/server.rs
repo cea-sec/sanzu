@@ -378,28 +378,30 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
 
         let mut events = vec![];
         if let Some((width, height)) = new_size.take() {
-            match server_info.change_resolution(config, width, height) {
-                Ok(_) => {
-                    // Create new encoder only if we change resolution
-                    debug!("New codec {}x{}", width, height);
-                    video_encoder = video_encoder
-                        .change_resolution(width, height)
-                        .context("Cannot change codec resolution")?;
-                    let msg = tunnel::EventDisplay {
-                        width: width as u32,
-                        height: height as u32,
-                    };
-                    let msg = tunnel::MessageSrv {
-                        msg: Some(tunnel::message_srv::Msg::Display(msg)),
-                    };
-                    events.push(msg);
-                }
-                Err(err) => {
-                    warn!("Error in change_resolution");
-                    err.chain().for_each(|cause| error!(" - due to {}", cause));
+            if !arguments.keep_server_resolution {
+                match server_info.change_resolution(config, width, height) {
+                    Ok(_) => {
+                        // Create new encoder only if we change resolution
+                        debug!("New codec {}x{}", width, height);
+                        video_encoder = video_encoder
+                            .change_resolution(width, height)
+                            .context("Cannot change codec resolution")?;
+                        let msg = tunnel::EventDisplay {
+                            width: width as u32,
+                            height: height as u32,
+                        };
+                        let msg = tunnel::MessageSrv {
+                            msg: Some(tunnel::message_srv::Msg::Display(msg)),
+                        };
+                        events.push(msg);
+                    }
+                    Err(err) => {
+                        warn!("Error in change_resolution");
+                        err.chain().for_each(|cause| error!(" - due to {}", cause));
+                    }
                 }
             }
-        };
+        }
 
         // Test is we receiver control message
         #[cfg(unix)]
