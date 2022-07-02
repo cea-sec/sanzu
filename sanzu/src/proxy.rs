@@ -13,6 +13,7 @@ use memmap2::MmapOptions;
 use sanzu_common::{tunnel, ReadWrite, Tunnel};
 
 use std::{
+    fmt::Write as _,
     fs,
     io::Cursor,
     net::{SocketAddr, TcpListener, TcpStream},
@@ -443,7 +444,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
                     let mut timings_str = String::new();
                     for timing in timings.times {
                         let time_str = format!("{:.1?}", timing.1);
-                        timings_str += &format!("{} {:7}", timing.0, time_str);
+                        write!(timings_str, "{} {:7}", timing.0, time_str)?;
                     }
                     time_encode_video = Some(format!(
                         "{:.1?} ({})",

@@ -1,7 +1,6 @@
 use anyhow::{Context, Result};
 extern crate libc;
-
-use std::{collections::HashMap, net::TcpStream, time::Instant};
+use std::{collections::HashMap, fmt::Write as _, net::TcpStream, time::Instant};
 
 use std::{
     convert::TryInto,
@@ -493,7 +492,7 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
         let times_img = if let Some(timings) = time_decode {
             for timing in timings.times {
                 let time_str = format!("{:.1?}", timing.1);
-                timings_str += &format!("{} {:8}", timing.0, time_str);
+                write!(timings_str, "{} {:8}", timing.0, time_str)?;
             }
             timings_str
         } else {
