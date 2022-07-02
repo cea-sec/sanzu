@@ -1,6 +1,7 @@
 use crate::ffmpeg_helper::{averror, set_option, AVCodec, AVCodecContext, AVFrame, AVPacket};
 use crate::yuv_rgb_rs;
 use anyhow::{Context, Result};
+use ffmpeg::AVPixelFormat;
 use ffmpeg_sys_next as ffmpeg;
 use std::{
     cmp::Ordering,
@@ -226,7 +227,7 @@ impl Encoder for EncoderFFmpeg {
         let pixel_format = unsafe { (*self.frame.ptr).format };
 
         match pixel_format {
-            0 => {
+            x if x == AVPixelFormat::AV_PIX_FMT_YUV420P as i32 => {
                 // yuv420
                 let (y_lane, u_lane, v_lane) = unsafe {
                     let y_lane = (*self.frame.ptr).linesize[0] as u32;
@@ -301,7 +302,7 @@ impl Encoder for EncoderFFmpeg {
                     .plane(2, uv_size)
                     .copy_from_slice(&self.image_v[0..uv_size]);
             }
-            5 => {
+            x if x == AVPixelFormat::AV_PIX_FMT_YUV444P as i32 => {
                 // yuv444
                 let (y_lane, u_lane, v_lane) = unsafe {
                     let y_lane = (*self.frame.ptr).linesize[0] as u32;
@@ -376,7 +377,7 @@ impl Encoder for EncoderFFmpeg {
                     .plane(2, uv_size)
                     .copy_from_slice(&self.image_v[0..uv_size]);
             }
-            23 => {
+            x if x == AVPixelFormat::AV_PIX_FMT_NV12 as i32 => {
                 // nv12
                 let (y_lane, uv_lane) = unsafe {
                     let y_lane = (*self.frame.ptr).linesize[0] as u32;
@@ -441,7 +442,7 @@ impl Encoder for EncoderFFmpeg {
                     .plane(1, uv_size)
                     .copy_from_slice(&self.image_uv[0..uv_size]);
             }
-            121 => {
+            x if x == AVPixelFormat::AV_PIX_FMT_RGB0 as i32 => {
                 // rgb0
                 let image_bpl = bytes_per_line as usize;
                 let height = height as usize;
