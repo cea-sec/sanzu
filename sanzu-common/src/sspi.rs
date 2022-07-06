@@ -77,8 +77,9 @@ impl SecurityPackage {
     pub fn acquire_credentials_handle_w(&mut self) -> Result<SspiStatus> {
         u32_to_result(unsafe {
             let mut _timestamp = LARGE_INTEGER::default();
-            let mut packagename_vec = self
-                .packagename
+            let mut packagename = self.packagename.to_owned();
+            packagename.push('\x00');
+            let mut packagename_vec = packagename
                 .as_bytes()
                 .iter()
                 .map(|&byte| byte as i8)
