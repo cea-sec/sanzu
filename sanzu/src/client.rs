@@ -106,7 +106,12 @@ impl ClientInterface for StdioClientInterface {
         let stdin = std::io::stdin();
         std::io::stdout().flush().unwrap();
         stdin.read_line(&mut user).context("Error in read login")?;
-        user.pop();
+
+        // We use trim here assuming it's suitable for logins
+        // which should not end with a whitespace
+        let len = user.trim().len();
+        user.truncate(len);
+
         Ok(user)
     }
 
