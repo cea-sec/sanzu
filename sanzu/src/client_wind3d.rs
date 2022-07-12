@@ -57,8 +57,8 @@ use winapi::{
             WM_ACTIVATE, WM_CHANGECBCHAIN, WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE,
             WM_DRAWCLIPBOARD, WM_INPUT, WM_KILLFOCUS, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
             WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
-            WM_SETFOCUS, WM_SETICON, WM_USER, WNDCLASSEXA, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
-            WS_DLGFRAME, WS_MAXIMIZE, WS_POPUP, WS_VISIBLE,
+            WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_USER, WNDCLASSEXA, WS_CLIPCHILDREN,
+            WS_CLIPSIBLINGS, WS_DLGFRAME, WS_MAXIMIZE, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE,
         },
     },
 };
@@ -795,9 +795,10 @@ extern "system" fn custom_wnd_proc(
                     .expect("Error in send EventDisplay");
             }
         }
-        WM_DISPLAYCHANGE => {
+        WM_DISPLAYCHANGE | WM_SIZE => {
             let width = lparam & 0xFFFF;
             let height = (lparam >> 16) & 0xFFFF;
+
             info!("Resolution change {}x{}", width, height);
             let msg = tunnel::EventDisplay {
                 width: width as u32,
@@ -948,7 +949,7 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
 
 pub fn init_wind3d(
     argumets: &ArgumentsClient,
-    _seamless: bool,
+    seamless: bool,
     server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Client>> {
     let (client_info, frame_receiver, event_sender, cursor_receiver, shape_receiver) =
@@ -958,6 +959,7 @@ pub fn init_wind3d(
             argumets.printdir.map(|printdir| printdir.to_string()),
         );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
+    let window_mode = argumets.window_mode;
 
     FRAME_RECEIVER.lock().unwrap().replace(frame_receiver);
     EVENT_SENDER.lock().unwrap().replace(event_sender);
@@ -1031,17 +1033,21 @@ pub fn init_wind3d(
 
         let window_name = CString::new("D3D").expect("Error in create CString D3D");
         let window_name_ptr = window_name.as_ptr();
+
+        let mut window_style = WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
+
+        if !window_mode {
+            window_style |= WS_MAXIMIZE | WS_POPUP;
+        } else {
+            window_style |= WS_OVERLAPPEDWINDOW;
+        }
+
         let window: HWND = unsafe {
             CreateWindowExA(
                 0,
                 wc.lpszClassName,
                 window_name_ptr,
-                WS_VISIBLE
-                    | WS_POPUP
-                    | WS_MAXIMIZE
-                    | WS_DLGFRAME
-                    | WS_CLIPSIBLINGS
-                    | WS_CLIPCHILDREN,
+                window_style,
                 0,
                 0,
                 screen_width as i32,
@@ -1077,12 +1083,16 @@ pub fn init_wind3d(
 
         info!("Init d3d ok");
 
-        let ptr = hook_callback as *const ();
-        let function: unsafe extern "system" fn(code: i32, wParam: usize, lParam: isize) -> isize =
-            unsafe { std::mem::transmute(ptr) };
+        if !window_mode {
+            let ptr = hook_callback as *const ();
+            let function: unsafe extern "system" fn(
+                code: i32,
+                wParam: usize,
+                lParam: isize,
+            ) -> isize = unsafe { std::mem::transmute(ptr) };
 
-        let _hook_id = unsafe { SetWindowsHookExA(WH_MOUSE_LL, Some(function), null_mut(), 0) };
-
+            let _hook_id = unsafe { SetWindowsHookExA(WH_MOUSE_LL, Some(function), null_mut(), 0) };
+        }
         /* Register class for subwindows */
         let class_name = CString::new("subwindows_class").expect("Error in create CString D3D");
         let class_name_ptr = class_name.as_ptr();
@@ -1146,10 +1156,11 @@ pub fn init_wind3d(
                 info!("receive shape {:?}", final_areas);
             }
 
-            if let Some(areas) = final_areas {
-                set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+            if seamless {
+                if let Some(areas) = final_areas {
+                    set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+                }
             }
-
             // Cursor
             // Only keep last cursor
             let mut last_cursor = None;
@@ -1163,6 +1174,9 @@ pub fn init_wind3d(
             }
 
             while let Ok(area_mngr) = WINDOW_RECEIVER.lock().unwrap().as_mut().unwrap().try_recv() {
+                if !seamless {
+                    continue;
+                }
                 match area_mngr {
                     AreaManager::CreateArea(id) => {
                         let instance_handle = unsafe { GetModuleHandleA(null_mut()) };
