@@ -110,6 +110,51 @@ jobs:
       with:
         name: sanzu_server.exe
         path: ./target/release/sanzu_server.exe
+
+  docker-alma8:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: build
+        run: cargo clean && cd build && make almalinux8
+
+  docker-alma9:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: build
+        run: cargo clean && cd build && make almalinux9
+
+  docker-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: build
+        run: cargo clean && cd build && make windows
+
+  docker-debian:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: build
+        run: cargo clean && cd build && make debian
+
   fmt:
     runs-on: ubuntu-latest
     steps:

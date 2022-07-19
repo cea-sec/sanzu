@@ -6,24 +6,31 @@ SANZU_VERSION:=$(shell grep "^version" ../sanzu/Cargo.toml  | head -1 | cut -d'"
 
 debian:
 	docker build -t sanzu-builder:debian -f Dockerfile-debian .
-	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu" \
+	docker run -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu" \
 		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:debian
-	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu --variant=client" \
+	docker run -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu --variant=client" \
 		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:debian
-	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu_broker" \
+	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu_broker" \
 		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:debian
 
-almalinux:
-	docker build -t sanzu-builder:almalinux -f Dockerfile-almalinux .
-	docker run -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu" \
-		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux
-	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu-broker" \
-		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux
+almalinux8:
+	docker build -t sanzu-builder:almalinux8 -f Dockerfile-almalinux8 .
+	docker run -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux8
+	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu-broker" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux8
+
+almalinux9:
+	docker build -t sanzu-builder:almalinux9 -f Dockerfile-almalinux9 .
+	docker run -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux9
+	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu-broker" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux9
 
 windows:
 	docker build -t sanzu-builder:windows -f Dockerfile-windows .
-	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGO_OPT="-p sanzu --no-default-features --release" sanzu-builder:windows
-	docker run --rm -it $(DOCKER_OPT) -u ${DOCKER_USER} sanzu-builder:windows bash -c \
+	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGO_OPT="-p sanzu --no-default-features --release" sanzu-builder:windows
+	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} sanzu-builder:windows bash -c \
 		"cd /usr/x86_64-w64-mingw32/lib/ \
                 ; cp ../bin/libopus-0.dll swscale-*.dll postproc-*.dll \
 		     avutil-*.dll avdevice-*.dll avcodec-*.dll \
@@ -37,6 +44,7 @@ clean:
 
 mrproper: clean
 	docker image rm sanzu-builder:debian
-	docker image rm sanzu-builder:almalinux
+	docker image rm sanzu-builder:almalinux8
+	docker image rm sanzu-builder:almalinux9
 	docker image rm sanzu-builder:windows
 
