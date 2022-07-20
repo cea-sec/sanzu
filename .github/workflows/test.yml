@@ -85,12 +85,30 @@ jobs:
       with:
         toolchain: stable
 
+    - name: dl full ffmpeg binaries
+      run: |
+        curl -L  -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n4.4-latest-win64-gpl-shared-4.4.zip
+
+    - name: dl full ffmpeg binaries
+      run: |
+        unzip -qq ffmpeg.zip -d ffmpeg
+
+    - name: cp files
+      run: |
+         cp ffmpeg\ffmpeg-n4.4-latest-win64-gpl-shared-4.4\bin\* .
+
+    - name: install cargo wix
+      run: |
+        cargo install --git https://github.com/volks73/cargo-wix cargo-wix
+
     - name: prepare vcpkg
       run: |
         vcpkg integrate install
+
     - name: install dep
       run: |
-        vcpkg install ffmpeg:x64-windows
+        vcpkg install ffmpeg[gpl,x264]:x64-windows
+
     - name: Build
       env:
         RUSTFLAGS: -D warnings
@@ -98,6 +116,10 @@ jobs:
       with:
         command: build
         args: --release --verbose -p sanzu --no-default-features
+
+    - name: run cargo wix
+      run: |
+         cargo wix --nocapture --package=sanzu
 
     - name: Upload resulting 'sanzu_client.exe'
       uses: actions/upload-artifact@v1
@@ -110,6 +132,12 @@ jobs:
       with:
         name: sanzu_server.exe
         path: ./target/release/sanzu_server.exe
+
+    - name: Upload resulting 'sanzu-0.1.0-x86_64.msi'
+      uses: actions/upload-artifact@v1
+      with:
+        name: sanzu-0.1.0-x86_64.msi
+        path: ./target/wix/sanzu-0.1.0-x86_64.msi
 
   docker-alma8:
     runs-on: ubuntu-latest
