@@ -82,6 +82,68 @@ fn check_cusor_size(width: u32, height: u32, xhot: u32, yhot: u32) -> Result<(u3
     }
 }
 
+pub trait ClientInterface {
+    fn pam_echo(&mut self, echo: String) -> Result<String>;
+
+    fn pam_blind(&mut self, blind: String) -> Result<String>;
+
+    fn pam_info(&mut self, info: String) -> Result<()>;
+
+    fn pam_error(&mut self, error: String) -> Result<()>;
+
+    fn pam_end(&mut self, end: bool) -> Result<()>;
+
+    fn client_exit(&mut self, status: &Result<()>);
+}
+
+#[derive(Default)]
+pub struct StdioClientInterface {}
+
+impl ClientInterface for StdioClientInterface {
+    fn pam_echo(&mut self, echo: String) -> Result<String> {
+        println!("{}", echo);
+        let mut user = String::new();
+        let stdin = std::io::stdin();
+        std::io::stdout().flush().unwrap();
+        stdin.read_line(&mut user).context("Error in read login")?;
+
+        // We use trim here assuming it's suitable for logins
+        // which should not end with a whitespace
+        let len = user.trim().len();
+        user.truncate(len);
+
+        Ok(user)
+    }
+
+    fn pam_blind(&mut self, blind: String) -> Result<String> {
+        rpassword::prompt_password(blind).context("Error in read password")
+    }
+
+    fn pam_info(&mut self, info: String) -> Result<()> {
+        println!("{}", info);
+        Ok(())
+    }
+
+    fn pam_error(&mut self, error: String) -> Result<()> {
+        println!("{}", error);
+        Ok(())
+    }
+
+    fn pam_end(&mut self, end: bool) -> Result<()> {
+        match end {
+            true => {
+                info!("Pam end ok");
+            }
+            false => {
+                info!("Pam end err");
+            }
+        }
+        Ok(())
+    }
+
+    fn client_exit(&mut self, _status: &Result<()>) {}
+}
+
 /// Client main loop
 ///
 /// The loop is composed of the following actions:
@@ -90,7 +152,23 @@ fn check_cusor_size(width: u32, height: u32, xhot: u32, yhot: u32) -> Result<(u3
 /// - receive events from the server
 /// - decode and handle those events (image decoding, sound, notifications, clipboard, ...)
 /// - image update if necessary
-pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<()> {
+///
+
+pub fn run(
+    client_config: &ConfigClient,
+    arguments: &ArgumentsClient,
+    mut client_interface: impl ClientInterface,
+) -> Result<()> {
+    let res = do_run(client_config, arguments, &mut client_interface);
+    client_interface.client_exit(&res);
+    res
+}
+
+pub fn do_run(
+    client_config: &ConfigClient,
+    arguments: &ArgumentsClient,
+    client_interface: &mut impl ClientInterface,
+) -> Result<()> {
     let mut sound_obj = if arguments.audio {
         Some(
             SoundDecoder::new(
@@ -182,44 +260,33 @@ pub fn run(client_config: &ConfigClient, arguments: &ArgumentsClient) -> Result<
         loop {
             let msg = recv_server_msg_type!(server, Pamconversation)
                 .context("Error in recv PamConversation")?;
+
             match msg.msg {
                 Some(tunnel::pam_conversation::Msg::Echo(echo)) => {
-                    println!("{}", echo);
-                    let mut user = String::new();
-                    let stdin = std::io::stdin();
-                    std::io::stdout().flush().unwrap();
-                    stdin
-                        .read_line(&mut user)
-                        .context("Error in read login")
+                    let user = client_interface
+                        .pam_echo(echo)
                         .map_err(|err| send_client_err_event(server, err))?;
-                    user.pop(); // Remove "\n"
                     let client_user = tunnel::EventPamUser { user };
                     send_client_msg_type!(server, client_user, Pamuser)
                         .context("Error in send EventPamUser")?;
                 }
                 Some(tunnel::pam_conversation::Msg::Blind(blind)) => {
-                    let password = rpassword::prompt_password(blind)
-                        .context("Error in read password")
+                    let password = client_interface
+                        .pam_blind(blind)
                         .map_err(|err| send_client_err_event(server, err))?;
                     let client_pwd = tunnel::EventPamPwd { password };
                     send_client_msg_type!(server, client_pwd, Pampwd)
                         .context("Error in send EventPamPwd")?;
                 }
+
                 Some(tunnel::pam_conversation::Msg::Info(info)) => {
-                    println!("{}", info);
+                    client_interface.pam_info(info)?;
                 }
                 Some(tunnel::pam_conversation::Msg::Error(err)) => {
-                    println!("{}", err);
+                    client_interface.pam_error(err)?;
                 }
                 Some(tunnel::pam_conversation::Msg::End(end)) => {
-                    match end {
-                        true => {
-                            info!("Pam end ok");
-                        }
-                        false => {
-                            info!("Pam end err");
-                        }
-                    }
+                    client_interface.pam_end(end)?;
                     break;
                 }
                 None => {
