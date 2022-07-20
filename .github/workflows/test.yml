@@ -133,11 +133,11 @@ jobs:
         name: sanzu_server.exe
         path: ./target/release/sanzu_server.exe
 
-    - name: Upload resulting 'sanzu-0.1.0-x86_64.msi'
-      uses: actions/upload-artifact@v1
+    - name: Upload resulting sanzu msi
+      uses: actions/upload-artifact@v3
       with:
-        name: sanzu-0.1.0-x86_64.msi
-        path: ./target/wix/sanzu-0.1.0-x86_64.msi
+        name: sanzu_msi
+        path: ./target/wix/*.msi
 
   docker-alma8:
     runs-on: ubuntu-latest
@@ -150,6 +150,12 @@ jobs:
       - name: build
         run: cargo clean && cd build && make almalinux8
 
+      - name: Upload resulting 'alma8 pkg'
+        uses: actions/upload-artifact@v3
+        with:
+          name: pkg_alma8
+          path: ./target/generate-rpm/*
+
   docker-alma9:
     runs-on: ubuntu-latest
     steps:
@@ -160,6 +166,12 @@ jobs:
           components: rustfmt
       - name: build
         run: cargo clean && cd build && make almalinux9
+
+      - name: Upload resulting 'alma9 pkg'
+        uses: actions/upload-artifact@v3
+        with:
+          name: pkg_alma9
+          path: ./target/generate-rpm/*
 
   docker-windows:
     runs-on: ubuntu-latest
@@ -182,6 +194,12 @@ jobs:
           components: rustfmt
       - name: build
         run: cargo clean && cd build && make debian
+
+      - name: Upload resulting 'debian pkg'
+        uses: actions/upload-artifact@v3
+        with:
+          name: pkg_debian
+          path: ./target/debian/*
 
   fmt:
     runs-on: ubuntu-latest
