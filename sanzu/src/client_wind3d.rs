@@ -101,6 +101,7 @@ const WM_UPDATE_FRAME: UINT = WM_USER + 1;
 const WM_WTSSESSION_CHANGE: DWORD = 0x2B1;
 //const WTS_SESSION_LOCK: DWORD = 0x7;
 const WTS_SESSION_UNLOCK: DWORD = 0x8;
+const MIN_CURSOR_SIZE: u32 = 32;
 
 enum AreaManager {
     CreateArea(usize),
@@ -917,24 +918,49 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
         }
     }
 
+    // Set minimum width to 32 pixels to avoid windows cursor scale
+    let (data, width, height) = if width < MIN_CURSOR_SIZE {
+        let mut data = vec![];
+        for i in 0..height {
+            data.append(
+                &mut cursor_bgra[(width * 4 * i) as usize..(width * 4 * (i + 1)) as usize].to_vec(),
+            );
+            data.append(&mut vec![0u8; ((MIN_CURSOR_SIZE - width) * 4) as usize])
+        }
+        (data, MIN_CURSOR_SIZE, height)
+    } else {
+        (cursor_bgra.to_owned(), width, height)
+    };
+
+    // Set minimum height to 32 pixels to avoid windows cursor scale
+    let (data, width, height) = if height < MIN_CURSOR_SIZE {
+        let mut data = data;
+        data.append(&mut vec![
+            0u8;
+            (width * (MIN_CURSOR_SIZE - height) * 4) as usize
+        ]);
+        (data, width, MIN_CURSOR_SIZE)
+    } else {
+        (cursor_bgra.to_owned(), width, height)
+    };
+
     let (data, width, height) = match width.cmp(&height) {
         Ordering::Less => {
             let mut data = vec![];
             for i in 0..height {
                 data.append(
-                    &mut cursor_bgra[(width * 4 * i) as usize..(width * 4 * (i + 1)) as usize]
-                        .to_vec(),
+                    &mut data[(width * 4 * i) as usize..(width * 4 * (i + 1)) as usize].to_vec(),
                 );
                 data.append(&mut vec![0u8; ((height - width) * 4) as usize])
             }
             (data, height, height)
         }
         Ordering::Greater => {
-            let mut data = cursor_bgra.to_owned();
+            let mut data = data;
             data.append(&mut vec![0u8; (width * (width - height) * 4) as usize]);
             (data, width, width)
         }
-        Ordering::Equal => (cursor_bgra.to_owned(), width, height),
+        Ordering::Equal => (data, width, height),
     };
 
     let mut image = ico::IconImage::from_rgba_data(width, height, data);
