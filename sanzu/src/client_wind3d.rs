@@ -949,7 +949,7 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
 
 pub fn init_wind3d(
     argumets: &ArgumentsClient,
-    seamless: bool,
+    mut seamless: bool,
     server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Client>> {
     let (client_info, frame_receiver, event_sender, cursor_receiver, shape_receiver) =
@@ -961,6 +961,9 @@ pub fn init_wind3d(
     let (screen_width, screen_height) = (client_info.width, client_info.height);
     let window_mode = argumets.window_mode;
 
+    if window_mode {
+        seamless = false;
+    }
     FRAME_RECEIVER.lock().unwrap().replace(frame_receiver);
     EVENT_SENDER.lock().unwrap().replace(event_sender);
     CURSOR_RECEIVER.lock().unwrap().replace(cursor_receiver);
