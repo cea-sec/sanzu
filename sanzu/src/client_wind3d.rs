@@ -386,7 +386,6 @@ pub unsafe fn render(
     height: u32,
     p_direct3d_device: *mut IDirect3DDevice9,
     p_direct3d_surface: *mut IDirect3DSurface9,
-    rect_viewport: RECT,
 ) -> i32 {
     let mut d3d_rect = D3DLOCKED_RECT::default();
     if p_direct3d_surface.is_null() {
@@ -441,11 +440,19 @@ pub unsafe fn render(
     let mut p_back_buffer: *mut IDirect3DSurface9 = null_mut();
     (*p_direct3d_device).GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _);
 
+    /* Use rect with img size to avoid stretching */
+    let new_rect = RECT {
+        left: 0,
+        top: 0,
+        right: width as i32,
+        bottom: height as i32,
+    };
+
     (*p_direct3d_device).StretchRect(
         p_direct3d_surface,
         null_mut(),
         p_back_buffer,
-        &rect_viewport as *const _,
+        &new_rect as *const _,
         D3DTEXF_NONE,
     );
 
@@ -1131,17 +1138,7 @@ pub fn init_wind3d(
                 let ret = {
                     let p_direct3d_device = P_DIRECT3D_DEVICE.load(atomic::Ordering::Acquire);
                     let p_direct3d_surface = P_DIRECT3D_SURFACE.load(atomic::Ordering::Acquire);
-                    let rect_viewport = *RECT_VIEWPORT.lock().unwrap();
-                    unsafe {
-                        render(
-                            data,
-                            width,
-                            height,
-                            p_direct3d_device,
-                            p_direct3d_surface,
-                            rect_viewport,
-                        )
-                    }
+                    unsafe { render(data, width, height, p_direct3d_device, p_direct3d_surface) }
                 };
                 if ret < 0 {
                     let window = WINHANDLE.load(atomic::Ordering::Acquire);
