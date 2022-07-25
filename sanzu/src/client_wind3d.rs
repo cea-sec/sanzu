@@ -82,7 +82,6 @@ lazy_static! {
         right: 0,
         bottom: 0,
     });
-    static ref FRAME_RECEIVER: Mutex<Option<FrameReceiver>> = Mutex::new(None);
     static ref EVENT_SENDER: Mutex<Option<Sender<tunnel::MessageClient>>> = Mutex::new(None);
     static ref CURSOR_RECEIVER: Mutex<Option<CursorReceiver>> = Mutex::new(None);
     static ref SHAPE_RECEIVER: Mutex<Option<Receiver<Vec<Area>>>> = Mutex::new(None);
@@ -971,10 +970,7 @@ pub fn init_wind3d(
     if window_mode {
         seamless = false;
     }
-    FRAME_RECEIVER.lock().unwrap().replace(frame_receiver);
     EVENT_SENDER.lock().unwrap().replace(event_sender);
-    CURSOR_RECEIVER.lock().unwrap().replace(cursor_receiver);
-    SHAPE_RECEIVER.lock().unwrap().replace(shape_receiver);
 
     let mut x = RAWINPUTDEVICE {
         usUsagePage: 1,
@@ -1000,7 +996,6 @@ pub fn init_wind3d(
     };
 
     let (window_sender, window_receiver) = channel();
-    WINDOW_RECEIVER.lock().unwrap().replace(window_receiver);
     WINDOW_SENDER.lock().unwrap().replace(window_sender);
 
     let (msg_sender, msg_receiver) = channel();
@@ -1120,13 +1115,11 @@ pub fn init_wind3d(
             panic!("Cannot register class");
         }
 
-        let mut msg = MSG::default();
-        while msg.message != WM_QUIT {
-            // Only take one image from the queue. As it's a sync channel, this
-            // will add a backpressure to the main thread.
-            if let Ok((data, width, height)) =
-                FRAME_RECEIVER.lock().unwrap().as_ref().unwrap().try_recv()
-            {
+        // Render thread
+        // Only take one image from the queue. As it's a sync channel, this
+        // will add a backpressure to the main thread.
+        thread::spawn(move || loop {
+            if let Ok((data, width, height)) = frame_receiver.recv() {
                 if (width, height) != *SCREEN_SIZE.lock().unwrap() {
                     let window = WINHANDLE.load(atomic::Ordering::Acquire);
 
@@ -1147,33 +1140,36 @@ pub fn init_wind3d(
                     }
                 }
             }
+        });
 
-            // Area
-            // Only keep last areas
-            let mut final_areas = None;
-            while let Ok(areas) = SHAPE_RECEIVER.lock().unwrap().as_ref().unwrap().try_recv() {
-                final_areas = Some(areas);
-                info!("receive shape {:?}", final_areas);
-            }
-
-            if seamless {
-                if let Some(areas) = final_areas {
-                    set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+        // Clipping area thread
+        thread::spawn(move || {
+            loop {
+                // Area
+                // Only keep last areas
+                if let Ok(areas) = shape_receiver.recv() {
+                    if seamless {
+                        info!("receive shape {:?}", areas);
+                        set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+                    }
                 }
             }
-            // Cursor
-            // Only keep last cursor
-            let mut last_cursor = None;
-            while let Ok(cursor_data) = CURSOR_RECEIVER.lock().unwrap().as_ref().unwrap().try_recv()
-            {
-                last_cursor = Some(cursor_data);
+        });
+
+        let mut msg = MSG::default();
+        while msg.message != WM_QUIT {
+            // Set focus if we activate a sub window
+            if msg_receiver.try_recv().is_ok() {
+                unsafe {
+                    SetFocus(WINHANDLE.load(atomic::Ordering::Acquire));
+                };
             }
 
-            if let Some((cursor_data, width, height, xhot, yhot)) = last_cursor {
+            // Receive cursor shape
+            if let Ok((cursor_data, width, height, xhot, yhot)) = cursor_receiver.try_recv() {
                 set_window_cursor(&cursor_data, width, height, xhot, yhot);
             }
-
-            while let Ok(area_mngr) = WINDOW_RECEIVER.lock().unwrap().as_mut().unwrap().try_recv() {
+            if let Ok(area_mngr) = window_receiver.try_recv() {
                 if !seamless {
                     continue;
                 }
@@ -1225,12 +1221,6 @@ pub fn init_wind3d(
                         }
                     }
                 }
-            }
-
-            while msg_receiver.try_recv().is_ok() {
-                unsafe {
-                    SetFocus(WINHANDLE.load(atomic::Ordering::Acquire));
-                };
             }
 
             while unsafe { PeekMessageA(&mut msg as *mut _, null_mut(), 0, 0, PM_REMOVE) } != 0 {
