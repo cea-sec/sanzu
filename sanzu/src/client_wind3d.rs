@@ -1042,7 +1042,7 @@ pub fn init_wind3d(
         let mut window_style = WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
         if !window_mode {
-            window_style |= WS_MAXIMIZE | WS_POPUP;
+            window_style |= WS_MAXIMIZE | WS_POPUP | WS_DLGFRAME;
         } else {
             window_style |= WS_OVERLAPPEDWINDOW;
         }
