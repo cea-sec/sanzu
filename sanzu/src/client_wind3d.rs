@@ -82,7 +82,6 @@ lazy_static! {
         right: 0,
         bottom: 0,
     });
-    static ref FRAME_RECEIVER: Mutex<Option<FrameReceiver>> = Mutex::new(None);
     static ref EVENT_SENDER: Mutex<Option<Sender<tunnel::MessageClient>>> = Mutex::new(None);
     static ref CURSOR_RECEIVER: Mutex<Option<CursorReceiver>> = Mutex::new(None);
     static ref SHAPE_RECEIVER: Mutex<Option<Receiver<Vec<Area>>>> = Mutex::new(None);
@@ -102,6 +101,7 @@ const WM_UPDATE_FRAME: UINT = WM_USER + 1;
 const WM_WTSSESSION_CHANGE: DWORD = 0x2B1;
 //const WTS_SESSION_LOCK: DWORD = 0x7;
 const WTS_SESSION_UNLOCK: DWORD = 0x8;
+const MIN_CURSOR_SIZE: u32 = 32;
 
 enum AreaManager {
     CreateArea(usize),
@@ -386,7 +386,6 @@ pub unsafe fn render(
     height: u32,
     p_direct3d_device: *mut IDirect3DDevice9,
     p_direct3d_surface: *mut IDirect3DSurface9,
-    rect_viewport: RECT,
 ) -> i32 {
     let mut d3d_rect = D3DLOCKED_RECT::default();
     if p_direct3d_surface.is_null() {
@@ -441,11 +440,19 @@ pub unsafe fn render(
     let mut p_back_buffer: *mut IDirect3DSurface9 = null_mut();
     (*p_direct3d_device).GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _);
 
+    /* Use rect with img size to avoid stretching */
+    let new_rect = RECT {
+        left: 0,
+        top: 0,
+        right: width as i32,
+        bottom: height as i32,
+    };
+
     (*p_direct3d_device).StretchRect(
         p_direct3d_surface,
         null_mut(),
         p_back_buffer,
-        &rect_viewport as *const _,
+        &new_rect as *const _,
         D3DTEXF_NONE,
     );
 
@@ -911,24 +918,49 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
         }
     }
 
+    // Set minimum width to 32 pixels to avoid windows cursor scale
+    let (data, width, height) = if width < MIN_CURSOR_SIZE {
+        let mut data = vec![];
+        for i in 0..height {
+            data.append(
+                &mut cursor_bgra[(width * 4 * i) as usize..(width * 4 * (i + 1)) as usize].to_vec(),
+            );
+            data.append(&mut vec![0u8; ((MIN_CURSOR_SIZE - width) * 4) as usize])
+        }
+        (data, MIN_CURSOR_SIZE, height)
+    } else {
+        (cursor_bgra.to_owned(), width, height)
+    };
+
+    // Set minimum height to 32 pixels to avoid windows cursor scale
+    let (data, width, height) = if height < MIN_CURSOR_SIZE {
+        let mut data = data;
+        data.append(&mut vec![
+            0u8;
+            (width * (MIN_CURSOR_SIZE - height) * 4) as usize
+        ]);
+        (data, width, MIN_CURSOR_SIZE)
+    } else {
+        (cursor_bgra.to_owned(), width, height)
+    };
+
     let (data, width, height) = match width.cmp(&height) {
         Ordering::Less => {
             let mut data = vec![];
             for i in 0..height {
                 data.append(
-                    &mut cursor_bgra[(width * 4 * i) as usize..(width * 4 * (i + 1)) as usize]
-                        .to_vec(),
+                    &mut data[(width * 4 * i) as usize..(width * 4 * (i + 1)) as usize].to_vec(),
                 );
                 data.append(&mut vec![0u8; ((height - width) * 4) as usize])
             }
             (data, height, height)
         }
         Ordering::Greater => {
-            let mut data = cursor_bgra.to_owned();
+            let mut data = data;
             data.append(&mut vec![0u8; (width * (width - height) * 4) as usize]);
             (data, width, width)
         }
-        Ordering::Equal => (cursor_bgra.to_owned(), width, height),
+        Ordering::Equal => (data, width, height),
     };
 
     let mut image = ico::IconImage::from_rgba_data(width, height, data);
@@ -949,7 +981,7 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
 
 pub fn init_wind3d(
     argumets: &ArgumentsClient,
-    seamless: bool,
+    mut seamless: bool,
     server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Client>> {
     let (client_info, frame_receiver, event_sender, cursor_receiver, shape_receiver) =
@@ -961,10 +993,10 @@ pub fn init_wind3d(
     let (screen_width, screen_height) = (client_info.width, client_info.height);
     let window_mode = argumets.window_mode;
 
-    FRAME_RECEIVER.lock().unwrap().replace(frame_receiver);
+    if window_mode {
+        seamless = false;
+    }
     EVENT_SENDER.lock().unwrap().replace(event_sender);
-    CURSOR_RECEIVER.lock().unwrap().replace(cursor_receiver);
-    SHAPE_RECEIVER.lock().unwrap().replace(shape_receiver);
 
     let mut x = RAWINPUTDEVICE {
         usUsagePage: 1,
@@ -990,7 +1022,6 @@ pub fn init_wind3d(
     };
 
     let (window_sender, window_receiver) = channel();
-    WINDOW_RECEIVER.lock().unwrap().replace(window_receiver);
     WINDOW_SENDER.lock().unwrap().replace(window_sender);
 
     let (msg_sender, msg_receiver) = channel();
@@ -1037,7 +1068,7 @@ pub fn init_wind3d(
         let mut window_style = WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
 
         if !window_mode {
-            window_style |= WS_MAXIMIZE | WS_POPUP;
+            window_style |= WS_MAXIMIZE | WS_POPUP | WS_DLGFRAME;
         } else {
             window_style |= WS_OVERLAPPEDWINDOW;
         }
@@ -1110,13 +1141,11 @@ pub fn init_wind3d(
             panic!("Cannot register class");
         }
 
-        let mut msg = MSG::default();
-        while msg.message != WM_QUIT {
-            // Only take one image from the queue. As it's a sync channel, this
-            // will add a backpressure to the main thread.
-            if let Ok((data, width, height)) =
-                FRAME_RECEIVER.lock().unwrap().as_ref().unwrap().try_recv()
-            {
+        // Render thread
+        // Only take one image from the queue. As it's a sync channel, this
+        // will add a backpressure to the main thread.
+        thread::spawn(move || loop {
+            if let Ok((data, width, height)) = frame_receiver.recv() {
                 if (width, height) != *SCREEN_SIZE.lock().unwrap() {
                     let window = WINHANDLE.load(atomic::Ordering::Acquire);
 
@@ -1128,17 +1157,7 @@ pub fn init_wind3d(
                 let ret = {
                     let p_direct3d_device = P_DIRECT3D_DEVICE.load(atomic::Ordering::Acquire);
                     let p_direct3d_surface = P_DIRECT3D_SURFACE.load(atomic::Ordering::Acquire);
-                    let rect_viewport = *RECT_VIEWPORT.lock().unwrap();
-                    unsafe {
-                        render(
-                            data,
-                            width,
-                            height,
-                            p_direct3d_device,
-                            p_direct3d_surface,
-                            rect_viewport,
-                        )
-                    }
+                    unsafe { render(data, width, height, p_direct3d_device, p_direct3d_surface) }
                 };
                 if ret < 0 {
                     let window = WINHANDLE.load(atomic::Ordering::Acquire);
@@ -1147,33 +1166,36 @@ pub fn init_wind3d(
                     }
                 }
             }
+        });
 
-            // Area
-            // Only keep last areas
-            let mut final_areas = None;
-            while let Ok(areas) = SHAPE_RECEIVER.lock().unwrap().as_ref().unwrap().try_recv() {
-                final_areas = Some(areas);
-                info!("receive shape {:?}", final_areas);
-            }
-
-            if seamless {
-                if let Some(areas) = final_areas {
-                    set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+        // Clipping area thread
+        thread::spawn(move || {
+            loop {
+                // Area
+                // Only keep last areas
+                if let Ok(areas) = shape_receiver.recv() {
+                    if seamless {
+                        info!("receive shape {:?}", areas);
+                        set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+                    }
                 }
             }
-            // Cursor
-            // Only keep last cursor
-            let mut last_cursor = None;
-            while let Ok(cursor_data) = CURSOR_RECEIVER.lock().unwrap().as_ref().unwrap().try_recv()
-            {
-                last_cursor = Some(cursor_data);
+        });
+
+        let mut msg = MSG::default();
+        while msg.message != WM_QUIT {
+            // Set focus if we activate a sub window
+            if msg_receiver.try_recv().is_ok() {
+                unsafe {
+                    SetFocus(WINHANDLE.load(atomic::Ordering::Acquire));
+                };
             }
 
-            if let Some((cursor_data, width, height, xhot, yhot)) = last_cursor {
+            // Receive cursor shape
+            if let Ok((cursor_data, width, height, xhot, yhot)) = cursor_receiver.try_recv() {
                 set_window_cursor(&cursor_data, width, height, xhot, yhot);
             }
-
-            while let Ok(area_mngr) = WINDOW_RECEIVER.lock().unwrap().as_mut().unwrap().try_recv() {
+            if let Ok(area_mngr) = window_receiver.try_recv() {
                 if !seamless {
                     continue;
                 }
@@ -1225,12 +1247,6 @@ pub fn init_wind3d(
                         }
                     }
                 }
-            }
-
-            while msg_receiver.try_recv().is_ok() {
-                unsafe {
-                    SetFocus(WINHANDLE.load(atomic::Ordering::Acquire));
-                };
             }
 
             while unsafe { PeekMessageA(&mut msg as *mut _, null_mut(), 0, 0, PM_REMOVE) } != 0 {

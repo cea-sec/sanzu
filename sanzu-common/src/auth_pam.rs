@@ -123,7 +123,6 @@ pub fn do_pam_auth(conn: &mut dyn ReadWrite, pam_name: &str) -> Result<String> {
     }
 
     let ret = final_user.is_some();
-    send_user_info(conn.clone(), "Pam authentification ok")?;
     let pam_msg = tunnel::pam_conversation::Msg::End(ret);
     let pam_end = tunnel::PamConversation { msg: Some(pam_msg) };
     send_server_msg_type!(*conn.lock().unwrap(), pam_end, Pamconversation)

@@ -809,6 +809,8 @@ impl Server for ServerInfo {
                     }
                 }
                 Some(tunnel::message_client::Msg::Display(event)) => {
+                    /* Reset frames count to send image with fresh resolution */
+                    self.frozen_frames_count = 0;
                     server_events.push(ServerEvent::ResolutionChange(event.width, event.height));
                 }
                 Some(tunnel::message_client::Msg::Clipboard(event)) => {
