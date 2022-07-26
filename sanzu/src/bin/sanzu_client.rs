@@ -8,6 +8,9 @@ use sanzu::{
     config::{read_client_config, ConfigClient},
     utils::ArgumentsClient,
 };
+
+use sanzu_common::proto::VERSION;
+
 use std::collections::HashMap;
 
 fn main() {
@@ -15,16 +18,21 @@ fn main() {
         .format_timestamp_nanos()
         .init();
 
-    let app = Command::new("Sanzu client")
-        .version("0.1.0")
-        .about(
-            r#"Stream client x11 from h264/?
+    let about = format!(
+        r#"Sanzu client: desktop video streaming
+
+Protocol version: {:?}
 
 To change log level:
 RUST_LOG=debug
 RUST_LOG=info
 "#,
-        )
+        VERSION
+    );
+
+    let app = Command::new("Sanzu client")
+        .version("0.1.0")
+        .about(about.as_str())
         .arg(
             Arg::new("ip")
                 .help("Sets the server IP (Ex: 127.0.0.1)")

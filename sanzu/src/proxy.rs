@@ -10,7 +10,10 @@ use crate::{
 };
 use byteorder::{LittleEndian, ReadBytesExt};
 use memmap2::MmapOptions;
-use sanzu_common::{tunnel, ReadWrite, Tunnel};
+use sanzu_common::{
+    proto::{recv_client_msg_or_error, recv_server_msg_or_error, VERSION},
+    tunnel, ReadWrite, Tunnel,
+};
 
 use std::{
     fmt::Write as _,
@@ -100,45 +103,6 @@ macro_rules! recv_srv_msg_type {
             }
         }
     }};
-}
-
-macro_rules! send_client_msg_type {
-    (
-        $sock: expr, $msg: expr, $name: ident
-    ) => {{
-        let msg_ok = tunnel::MessageClientOk {
-            msg: Some(tunnel::message_client_ok::Msg::$name($msg)),
-        };
-        let msgclient_ok = tunnel::ClientMsgOrErr {
-            msg: Some(tunnel::client_msg_or_err::Msg::Ok(msg_ok)),
-        };
-        Tunnel::send($sock, msgclient_ok)
-            .map_err(|err| anyhow!("Error in send: Peer has closed connection? ({:?})", err,))
-    }};
-}
-
-fn recv_client_msg_or_error(stream: &mut dyn ReadWrite) -> Result<tunnel::message_client_ok::Msg> {
-    let msg: tunnel::ClientMsgOrErr = Tunnel::recv(stream).context("Error in recv pkt")?;
-    match msg.msg {
-        Some(tunnel::client_msg_or_err::Msg::Ok(msg_ok)) => {
-            // Message is ok
-            if let Some(msg) = msg_ok.msg {
-                Ok(msg)
-            } else {
-                Err(anyhow!("Empty pkt from client"))
-            }
-        }
-        Some(tunnel::client_msg_or_err::Msg::Err(msg_err)) => {
-            // Message is err
-            let mut error = Err(anyhow!("[end err]"));
-            for err in msg_err.errors.iter().rev() {
-                error = error.context(err.to_string());
-            }
-            error = error.context("Error from proxy's client");
-            error
-        }
-        _ => Err(anyhow!("Bad pkt from client")),
-    }
 }
 
 macro_rules! recv_client_msg_type {
@@ -251,6 +215,38 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
         server.set_nodelay(true).expect("set_nodelay call failed");
         Box::new(server)
     };
+
+    /* Recv client version */
+    let client_version: tunnel::Version =
+        recv_client_msg_type!(&mut client, Version).context("Error in send client version")?;
+
+    info!("Client version {:?}", client_version);
+    if client_version.version != VERSION {
+        return Err(anyhow!(
+            "Version mismatch server: {:?} client: {:?}",
+            VERSION,
+            client_version.version
+        ));
+    }
+
+    /* Forward version to server */
+    send_client_msg_type!(&mut server, client_version, Version).context("Error in send Version")?;
+
+    /* Recv server version */
+    let server_version: tunnel::Version =
+        recv_server_msg_type!(&mut server, Version).context("Error in recv server version")?;
+
+    info!("Server version {:?}", server_version);
+    if server_version.version != VERSION {
+        return Err(anyhow!(
+            "Version mismatch server: {:?} client: {:?}",
+            server_version.version,
+            VERSION,
+        ));
+    }
+
+    /* Forward version to client */
+    send_server_msg_type!(&mut client, server_version, Version).context("Error in send Version")?;
 
     /* recv server hello */
     let msg = recv_srv_msg_type!(&mut server, Hello)

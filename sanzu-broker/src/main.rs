@@ -1,6 +1,9 @@
 #[macro_use]
 extern crate anyhow;
 
+#[macro_use]
+extern crate sanzu_common;
+
 use anyhow::{Context, Result};
 #[macro_use]
 extern crate log;
@@ -21,7 +24,9 @@ use nix::{
 
 use sanzu_common::{
     auth_pam::do_pam_auth,
+    proto::{recv_client_msg_or_error, recv_server_msg_or_error, Tunnel, VERSION},
     tls_helper::{get_subj_alt_names, make_server_config, tls_do_handshake},
+    tunnel,
     utils::get_username_from_principal,
 };
 
@@ -65,7 +70,7 @@ pub fn replace_source(args: &[String], needle: &str, new_str: &str) -> Vec<Strin
 fn auth_client(
     config: &Config,
     mut socket: &mut std::net::TcpStream,
-) -> Result<(ServerConnection, String)> {
+) -> Result<(ServerConnection, String, tunnel::Version)> {
     socket.set_nodelay(true)?;
 
     let tls_config = make_server_config(
@@ -106,6 +111,25 @@ fn auth_client(
 
     let mut conn = rustls::Stream::new(&mut tls_conn, &mut socket);
 
+    // Send client version
+    let server_version = tunnel::Version {
+        version: VERSION.to_owned(),
+    };
+    send_server_msg_type!(&mut conn, server_version, Version).context("Error in send Version")?;
+
+    /* Recv client version */
+    let client_version: tunnel::Version =
+        recv_client_msg_type!(&mut conn, Version).context("Error in send client version")?;
+
+    info!("Client version {:?}", client_version);
+    if client_version.version != VERSION {
+        return Err(anyhow!(
+            "Version mismatch server: {:?} client: {:?}",
+            VERSION,
+            client_version.version
+        ));
+    }
+
     if let Some(auth_type) = &config.auth_type {
         match auth_type {
             #[cfg(all(unix, feature = "kerberos"))]
@@ -130,7 +154,7 @@ fn auth_client(
 
     let username = username.context("No username")?;
     info!("Authenticated user: {:?}", username);
-    Ok((tls_conn, username))
+    Ok((tls_conn, username, client_version))
 }
 
 /// Forward connection between peers
@@ -203,6 +227,7 @@ pub fn connect_user(
     tls_conn: ServerConnection,
     username: &str,
     addr: &SocketAddr,
+    client_version: tunnel::Version,
 ) -> Result<()> {
     // Create socket file
     let uuid = Uuid::new_v4();
@@ -227,8 +252,24 @@ pub fn connect_user(
         return Err(anyhow!("Command execution failed"));
     }
 
-    let (server, addr) = listener.accept().context("failed to accept connection")?;
+    let (mut server, addr) = listener.accept().context("failed to accept connection")?;
     info!("Client {:?}", addr);
+
+    // Forward client version to son
+    send_client_msg_type!(&mut server, client_version, Version).context("Error in send Version")?;
+
+    /* Recv client version */
+    let server_version: tunnel::Version =
+        recv_server_msg_type!(&mut server, Version).context("Error in send server version")?;
+
+    info!("Server version {:?}", server_version);
+    if server_version.version != VERSION {
+        return Err(anyhow!(
+            "Version mismatch server: {:?} client: {:?}",
+            server_version.version,
+            VERSION,
+        ));
+    }
 
     // Link client & proxy
     if let Err(err) = loop_fwd_conn(server, client, tls_conn) {
@@ -270,15 +311,15 @@ fn auth_and_connect(config: &Config, mut sock: std::net::TcpStream, addr: Socket
         unsafe { libc::exit(1) };
     }
 
-    let (tls_conn, username) = match auth_client(config, &mut sock) {
-        Ok((tls_conn, username)) => (tls_conn, username),
+    let (tls_conn, username, client_version) = match auth_client(config, &mut sock) {
+        Ok((tls_conn, username, client_version)) => (tls_conn, username, client_version),
         Err(err) => {
             error!("Error in client auth {:?}", err);
             unsafe { libc::exit(1) };
         }
     };
 
-    if let Err(err) = connect_user(config, sock, tls_conn, &username, &addr) {
+    if let Err(err) = connect_user(config, sock, tls_conn, &username, &addr, client_version) {
         error!("Error for client {}: {:?}", addr, err);
     }
     unsafe { libc::exit(0) };
@@ -314,9 +355,18 @@ fn serve_user(config: &Config, address: IpAddr, port: u16) -> Result<()> {
 
 fn main() -> Result<()> {
     env_logger::Builder::from_default_env().init();
+
+    let about = format!(
+        r#"Sanzu broker
+
+Protocol version: {:?}
+"#,
+        VERSION
+    );
+
     let matches = Command::new("Surf server")
         .version("0.1.0")
-        .about("Manage client connection")
+        .about(about.as_str())
         .arg(
             Arg::new("config")
                 .short('f')

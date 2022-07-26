@@ -5,7 +5,7 @@ extern crate log;
 pub mod utils;
 #[macro_use]
 pub mod proto;
-pub use proto::{tunnel, ReadWrite, Stdio, Tunnel};
+pub use proto::{tunnel, ReadWrite, Stdio, Tunnel, VERSION};
 #[cfg(feature = "kerberos")]
 pub mod auth_kerberos;
 #[cfg(target_family = "unix")]
