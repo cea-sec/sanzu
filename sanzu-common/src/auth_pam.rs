@@ -56,12 +56,6 @@ impl pam::Conversation for &mut TunnelConversation<'_> {
         send_server_msg_type!(*self.conn.lock().unwrap(), pam_err, Pamconversation)
             .expect("Error in err send");
     }
-    fn username(&self) -> &str {
-        match self.user {
-            Some(ref user) => user,
-            None => "",
-        }
-    }
 }
 
 fn send_user_info(conn: Arc<Mutex<&mut dyn ReadWrite>>, msg: &str) -> Result<()> {
@@ -86,6 +80,7 @@ pub fn do_pam_auth(conn: &mut dyn ReadWrite, pam_name: &str) -> Result<String> {
         let ret = client.authenticate();
         match ret {
             Ok(_) => {
+                client.open_session().context("Cannot open pam session")?;
                 final_user = Some(client.get_user().context("Cannot get pam username")?);
                 break;
             }
