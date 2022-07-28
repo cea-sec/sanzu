@@ -7,6 +7,8 @@ use clap::{Arg, Command};
 
 use sanzu::{config::read_server_config, server, utils::ArgumentsSrv};
 
+use sanzu_common::proto::VERSION;
+
 const DEFAULT_CONFIG: &str = "/etc/sanzu.toml";
 
 fn main() -> Result<()> {
@@ -14,9 +16,17 @@ fn main() -> Result<()> {
         .format_timestamp_nanos()
         .init();
 
+    let about = format!(
+        r#"Sanzu server: desktop video streaming
+
+Protocol version: {:?}
+"#,
+        VERSION
+    );
+
     let matches = Command::new("Sanzu server")
         .version("0.1.0")
-        .about("Stream server x11 to h264/?")
+        .about(about.as_str())
         .arg(
             Arg::new("config")
                 .short('f')

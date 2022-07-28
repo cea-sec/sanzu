@@ -7,7 +7,7 @@ use sanzu_common::auth_pam::do_pam_auth;
 #[cfg(target_family = "unix")]
 use sanzu_common::Stdio;
 use sanzu_common::{
-    proto::{recv_client_msg_or_error, send_server_err_event},
+    proto::{recv_client_msg_or_error, send_server_err_event, VERSION},
     tls_helper::{get_subj_alt_names, make_server_config, tls_do_handshake},
     tunnel,
     utils::get_username_from_principal,
@@ -204,6 +204,25 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
 
     #[cfg(windows)]
     info!("Tls state: {}", has_tls);
+
+    // Send client version
+    let server_version = tunnel::Version {
+        version: VERSION.to_owned(),
+    };
+    send_server_msg_type!(&mut sock, server_version, Version).context("Error in send Version")?;
+
+    /* Recv client version */
+    let client_version: tunnel::Version =
+        recv_client_msg_type!(&mut sock, Version).context("Error in send client version")?;
+
+    info!("Client version {:?}", client_version);
+    if client_version.version != VERSION {
+        return Err(anyhow!(
+            "Version mismatch server: {:?} client: {:?}",
+            VERSION,
+            client_version.version
+        ));
+    }
 
     #[cfg(target_family = "unix")]
     if let Some(auth_type) = &config.auth_type {

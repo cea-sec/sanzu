@@ -3,6 +3,7 @@ extern crate log;
 
 use clap::{Arg, Command};
 use sanzu::{config::read_server_config, proxy, utils::ArgumentsProxy};
+use sanzu_common::proto::VERSION;
 use std::net::IpAddr;
 
 const DEFAULT_CONFIG: &str = "/etc/sanzu.toml";
@@ -10,9 +11,17 @@ const DEFAULT_CONFIG: &str = "/etc/sanzu.toml";
 fn main() {
     env_logger::Builder::from_default_env().init();
 
+    let about = format!(
+        r#"Sanzu proxy: desktop video streaming
+
+Protocol version: {:?}
+"#,
+        VERSION
+    );
+
     let matches = Command::new("Sanzu proxy")
         .version("0.1.0")
-        .about("Stream proxy x11 to h264/?")
+        .about(about.as_str())
         .arg(
             Arg::new("server_ip")
                 .help("Sets the server IP (Ex: 127.0.0.1)")
@@ -56,11 +65,11 @@ fn main() {
                 .help("Bind port number"),
         )
         .arg(
-            Arg::new("listen_unix_socket")
+            Arg::new("connect_unix_socket")
                 .short('u')
                 .long("unix_socket")
                 .takes_value(true)
-                .help("Path of the unix socket to connect to"),
+                .help("Path of the unix socket to connect to instead of listening for the client"),
         )
         .arg(
             Arg::new("encoder")
@@ -113,7 +122,7 @@ fn main() {
         .value_of("listen_port")
         .map(|x| x.parse::<u16>().expect("Cannot parse port"));
 
-    let unix_socket = matches.value_of("listen_unix_socket");
+    let unix_socket = matches.value_of("connect_unix_socket");
 
     let audio = matches.is_present("audio");
     let encoder_name = matches.value_of("encoder").unwrap_or("libx264");

@@ -1,6 +1,11 @@
 syntax = "proto3";
 package tunnel;
 
+
+message Version  {
+  string version = 1;
+}
+
 message EventSoundRaw {
   bytes data = 1;
 };
@@ -154,6 +159,7 @@ message MessageServerOk {
     EventKerberos kerberos = 2;
     ServerHello hello = 3;
     PamConversation pamconversation= 7;
+    Version version = 8;
   }
 }
 
@@ -225,6 +231,7 @@ message MessageClientOk {
     ClientHelloResolution clienthelloresolution= 4;
     EventPamUser pamuser = 5;
     EventPamPwd pampwd = 6;
+    Version version = 7;
   }
 };
 

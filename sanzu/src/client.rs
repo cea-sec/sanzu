@@ -12,7 +12,7 @@ use std::{
 };
 
 use sanzu_common::{
-    proto::{recv_server_msg_or_error, send_client_err_event},
+    proto::{recv_server_msg_or_error, send_client_err_event, VERSION},
     tls_helper::make_client_config,
     tunnel, ReadWrite, Tunnel,
 };
@@ -243,6 +243,25 @@ pub fn do_run(
     } else {
         &mut socket
     };
+
+    // Send client version
+    let client_version = tunnel::Version {
+        version: VERSION.to_owned(),
+    };
+    send_client_msg_type!(server, client_version, Version).context("Error in send Version")?;
+
+    /* Recv client version */
+    let server_version: tunnel::Version =
+        recv_server_msg_type!(server, Version).context("Error in send server version")?;
+
+    info!("Server version {:?}", server_version);
+    if server_version.version != VERSION {
+        return Err(anyhow!(
+            "Version mismatch server: {:?} client: {:?}",
+            server_version.version,
+            VERSION,
+        ));
+    }
 
     #[cfg(feature = "kerberos")]
     if let Some(cname) = arguments.server_cname {
