@@ -9,6 +9,7 @@ RUN set -eux; \
       g++ \
       libasound2-dev \
       ffmpeg \
+      protobuf-compiler \
       libavutil-dev \
       libclang-dev \
       libkrb5-dev \
