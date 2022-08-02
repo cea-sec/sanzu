@@ -122,9 +122,8 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
                     "Error in vsock address parsing {}",
                     arguments.address
                 ))?;
-                let listener =
-                    vsock::VsockListener::bind(&vsock::SockAddr::new_vsock(address, port))
-                        .context(format!("Error in VsockListener {} {}", address, port))?;
+                let listener = vsock::VsockListener::bind(&vsock::VsockAddr::new(address, port))
+                    .context(format!("Error in VsockListener {} {}", address, port))?;
                 let (socket, addr) = listener.accept().context("failed to accept connection")?;
                 info!("Client {:?}", addr);
                 Box::new(socket)
