@@ -197,10 +197,9 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
             .server_addr
             .parse::<u32>()
             .expect("Not a vsock address");
-        let server =
-            vsock::VsockStream::connect(&vsock::SockAddr::new_vsock(address, port)).context(
-                format!("Error in vsock server connection {:?} {:?}", address, port),
-            )?;
+        let server = vsock::VsockStream::connect(&vsock::VsockAddr::new(address, port)).context(
+            format!("Error in vsock server connection {:?} {:?}", address, port),
+        )?;
         info!("Connected to server");
         Box::new(server)
     } else {
