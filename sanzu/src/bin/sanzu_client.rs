@@ -1,12 +1,12 @@
 #[macro_use]
 extern crate log;
 
-use clap::{Arg, Command};
+use clap::{Arg, Command, PossibleValue};
 
 use sanzu::{
     client,
     config::{read_client_config, ConfigClient},
-    utils::ArgumentsClient,
+    utils::{ArgumentsClient, ClipboardConfig},
 };
 
 use sanzu_common::proto::VERSION;
@@ -109,11 +109,21 @@ RUST_LOG=info
                 .takes_value(false),
         )
         .arg(
-            Arg::new("restrict-clipboard")
-                .help("Don't send clipboard to server")
+            Arg::new("clipboard")
+                .help(r#"Control clipboard behavior:
+ - allow: send clipboard to server on local clipboard modification
+ - deny: never send local clipboard to server
+ - trig: send local clipboard to server on hitting special shortcut
+"#)
                 .short('q')
-                .long("restrict-clipboard")
-                .takes_value(false),
+                .long("clipboard")
+                .takes_value(true)
+                .default_missing_value("allow")
+                .value_parser([
+                    PossibleValue::new("allow"),
+                    PossibleValue::new("deny"),
+                    PossibleValue::new("trig"),
+                ]),
         )
         .arg(
             Arg::new("window-mode")
@@ -188,7 +198,16 @@ Ex: -j c:\user\dupond\printdir\
     let client_key = matches.value_of("client_key");
     let tls_server_name = matches.value_of("tls_server_name");
     let login = matches.is_present("login");
-    let restrict_clipboard = matches.is_present("restrict-clipboard");
+
+    let clipboard_config = match matches.value_of("clipboard").unwrap_or("allow") {
+        "allow" => ClipboardConfig::Allow,
+        "deny" => ClipboardConfig::Deny,
+        "trig" => ClipboardConfig::Trig,
+        _ => {
+            panic!("Unknown clipboard configuration");
+        }
+    };
+
     let window_mode = matches.is_present("window-mode");
     let decoder_name = matches.value_of("decoder");
     let printdir = matches.value_of("allow-print");
@@ -214,7 +233,7 @@ Ex: -j c:\user\dupond\printdir\
         client_cert,
         client_key,
         login,
-        restrict_clipboard,
+        clipboard_config,
         window_mode,
         decoder_name,
         printdir,

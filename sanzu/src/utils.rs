@@ -12,6 +12,13 @@ pub enum ClipboardSelection {
     Primary,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ClipboardConfig {
+    Allow,
+    Deny,
+    Trig,
+}
+
 pub struct ArgumentsSrv<'a> {
     pub vsock: bool,
     pub stdio: bool,
@@ -42,7 +49,7 @@ pub struct ArgumentsClient<'a> {
     pub client_cert: Option<&'a str>,
     pub client_key: Option<&'a str>,
     pub login: bool,
-    pub restrict_clipboard: bool,
+    pub clipboard_config: ClipboardConfig,
     pub window_mode: bool,
     pub decoder_name: Option<&'a str>,
     pub printdir: Option<&'a str>,
