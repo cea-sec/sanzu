@@ -219,7 +219,7 @@ fn init_grab<C: Connection>(
 
     let addr = unsafe { shmat(shmid, null_mut(), 0) } as *const u8;
     debug!("shm addr {:?}", addr);
-    let ptr_bad = unsafe { std::mem::transmute::<isize, *const u8>(-1) };
+    let ptr_bad = usize::MAX as *const u8;
     if addr == ptr_bad {
         return Err(anyhow!("ShmAt Error"));
     }
