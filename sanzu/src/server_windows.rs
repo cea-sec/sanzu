@@ -326,16 +326,14 @@ fn acquire_dxgi_frame() -> Result<(Vec<u8>, u32, u32, u32)> {
 
     let acquireddesktopimage =
         d3d11_get_resource_texture2d(desktop_resource).context("Cannot get desktop resource")?;
-    let p_acquireddesktopimage: *mut d3d11::ID3D11Texture2D =
-        unsafe { std::mem::transmute(acquireddesktopimage) };
+    let p_acquireddesktopimage: *mut d3d11::ID3D11Texture2D = acquireddesktopimage
+        as *const winapi::um::d3d11::ID3D11Texture2D
+        as *mut winapi::um::d3d11::ID3D11Texture2D;
 
     let p_id3d11texture2d = P_TEXTURE2D.load(atomic::Ordering::Acquire);
 
-    let p_copy_texture: *mut d3d11::ID3D11Texture2D =
-        unsafe { std::mem::transmute(p_id3d11texture2d) };
-
     let p_copy_resource: *mut d3d11::ID3D11Resource =
-        unsafe { std::mem::transmute(p_copy_texture) };
+        unsafe { std::mem::transmute(p_id3d11texture2d) };
 
     let d3d11_device_context = unsafe {
         P_DIRECT3D_DEVICE_CONTEXT
@@ -545,8 +543,9 @@ pub fn init_d3d11() -> Result<()> {
             let idxgisurface = d3d11_get_texture2d_surface(id3d11texture2d)
                 .context("Cannot get surface interface")?;
 
-            let p_idxgisurface: *mut dxgi::IDXGISurface =
-                unsafe { std::mem::transmute(idxgisurface) };
+            let p_idxgisurface: *mut dxgi::IDXGISurface = idxgisurface
+                as *const winapi::shared::dxgi::IDXGISurface
+                as *mut winapi::shared::dxgi::IDXGISurface;
 
             P_SURFACE.store(p_idxgisurface, atomic::Ordering::Release);
             let surface = unsafe { p_idxgisurface.as_ref() }.context("Null idxgisurface")?;

@@ -18,7 +18,7 @@ use winapi::{
     },
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum SspiStatus {
     Ok,
     ContinueNeeded,

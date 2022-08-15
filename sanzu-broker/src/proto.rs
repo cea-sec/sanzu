@@ -2,6 +2,7 @@ use byteorder::ByteOrder;
 use byteorder::{LittleEndian, ReadBytesExt};
 use std::io::{Read, Write};
 use std::{io, io::Cursor};
+
 pub use sanzu_tunnel::tunnel;
 
 const MAX_PACKET_LEN: usize = 10 * 1024 * 1024; // 10 Mo

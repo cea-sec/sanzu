@@ -10,5 +10,5 @@ pub fn get_username_from_principal(username: &str, realms: &[String]) -> Result<
             None => continue,
         }
     }
-    return Err(anyhow!("Invalid realm"));
+    Err(anyhow!("Invalid realm"))
 }

@@ -478,15 +478,23 @@ macro_rules! load_rgba_4_x_2 {
         $rgba_index1: expr,
         $rgba_index2: expr
     ) => {{
-        let rgba_ptr1_0 = std::mem::transmute(&$buffer_rgba[$rgba_index1]);
-        let rgba_ptr1_1 = std::mem::transmute(&$buffer_rgba[$rgba_index1 + 16]);
-        let rgba_ptr1_2 = std::mem::transmute(&$buffer_rgba[$rgba_index1 + 32]);
-        let rgba_ptr1_3 = std::mem::transmute(&$buffer_rgba[$rgba_index1 + 48]);
+        let rgba_ptr1_0 =
+            &$buffer_rgba[$rgba_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+        let rgba_ptr1_1 =
+            &$buffer_rgba[$rgba_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+        let rgba_ptr1_2 =
+            &$buffer_rgba[$rgba_index1 + 32] as *const u8 as *const std::arch::x86_64::__m128i;
+        let rgba_ptr1_3 =
+            &$buffer_rgba[$rgba_index1 + 48] as *const u8 as *const std::arch::x86_64::__m128i;
 
-        let rgba_ptr2_0 = std::mem::transmute(&$buffer_rgba[$rgba_index2]);
-        let rgba_ptr2_1 = std::mem::transmute(&$buffer_rgba[$rgba_index2 + 16]);
-        let rgba_ptr2_2 = std::mem::transmute(&$buffer_rgba[$rgba_index2 + 32]);
-        let rgba_ptr2_3 = std::mem::transmute(&$buffer_rgba[$rgba_index2 + 48]);
+        let rgba_ptr2_0 =
+            &$buffer_rgba[$rgba_index2] as *const u8 as *const std::arch::x86_64::__m128i;
+        let rgba_ptr2_1 =
+            &$buffer_rgba[$rgba_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+        let rgba_ptr2_2 =
+            &$buffer_rgba[$rgba_index2 + 32] as *const u8 as *const std::arch::x86_64::__m128i;
+        let rgba_ptr2_3 =
+            &$buffer_rgba[$rgba_index2 + 48] as *const u8 as *const std::arch::x86_64::__m128i;
 
         let rgba1 = _mm_loadu_si128(rgba_ptr1_0);
         let rgba2 = _mm_loadu_si128(rgba_ptr1_1);
@@ -634,7 +642,7 @@ unsafe fn rgba_to_yuv420_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr1_0 = std::mem::transmute(&mut buffer_y[y_index1]);
+    let y_ptr1_0 = &mut buffer_y[y_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr1_0, y_val);
 
     /* same for the second line, compute Y', (B-Y') and (R-Y'), in 16bits values
@@ -659,7 +667,7 @@ unsafe fn rgba_to_yuv420_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr2_0 = std::mem::transmute(&mut buffer_y[y_index2]);
+    let y_ptr2_0 = &mut buffer_y[y_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr2_0, y_val);
 
     /* Rescale Cb and Cr to their final range */
@@ -699,7 +707,7 @@ unsafe fn rgba_to_yuv420_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr1_1 = std::mem::transmute(&mut buffer_y[y_index1 + 16]);
+    let y_ptr1_1 = &mut buffer_y[y_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr1_1, y_val);
 
     /* same for the second line, compute Y', (B-Y') and (R-Y'), in 16bits values */
@@ -723,7 +731,7 @@ unsafe fn rgba_to_yuv420_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr2_1 = std::mem::transmute(&mut buffer_y[y_index2 + 16]);
+    let y_ptr2_1 = &mut buffer_y[y_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr2_1, y_val);
 
     /* Rescale Cb and Cr to their final range */
@@ -736,8 +744,8 @@ unsafe fn rgba_to_yuv420_step(
     let cb = _mm_packus_epi16(cb1_16, cb2_16);
     let cr = _mm_packus_epi16(cr1_16, cr2_16);
 
-    let u_ptr = std::mem::transmute(&mut buffer_u[u_index]);
-    let v_ptr = std::mem::transmute(&mut buffer_v[v_index]);
+    let u_ptr = &mut buffer_u[u_index] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let v_ptr = &mut buffer_v[v_index] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     _mm_storeu_si128(u_ptr, cb);
     _mm_storeu_si128(v_ptr, cr);
@@ -892,7 +900,7 @@ unsafe fn rgba_to_yuv444_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr1_0 = std::mem::transmute(&mut buffer_y[y_index1]);
+    let y_ptr1_0 = &mut buffer_y[y_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr1_0, y_val);
     /* same for the second line, compute Y', (B-Y') and (R-Y'), in 16bits values */
     /* Y is saved for each pixel, while only sums of (B-Y') and (R-Y') for pairs of adjacents
@@ -907,7 +915,7 @@ unsafe fn rgba_to_yuv444_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr2_0 = std::mem::transmute(&mut buffer_y[y_index2]);
+    let y_ptr2_0 = &mut buffer_y[y_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr2_0, y_val);
 
     /* Rescale Cb and Cr to their final range */
@@ -921,10 +929,10 @@ unsafe fn rgba_to_yuv444_step(
     let cr = _mm_packus_epi16(cr1_16, cr2_16);
     let cr = _mm_unpackhi_epi8(_mm_slli_si128(cr, 8), cr);
 
-    let u_ptr1_0 = std::mem::transmute(&mut buffer_u[u_index1]);
+    let u_ptr1_0 = &mut buffer_u[u_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(u_ptr1_0, cb);
 
-    let v_ptr1_0 = std::mem::transmute(&mut buffer_v[v_index1]);
+    let v_ptr1_0 = &mut buffer_v[v_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(v_ptr1_0, cr);
 
     let cb = _mm_packus_epi16(cb3_16, cb4_16);
@@ -932,10 +940,10 @@ unsafe fn rgba_to_yuv444_step(
     let cr = _mm_packus_epi16(cr3_16, cr4_16);
     let cr = _mm_unpackhi_epi8(_mm_slli_si128(cr, 8), cr);
 
-    let u_ptr2_0 = std::mem::transmute(&mut buffer_u[u_index2]);
+    let u_ptr2_0 = &mut buffer_u[u_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(u_ptr2_0, cb);
 
-    let v_ptr2_0 = std::mem::transmute(&mut buffer_v[v_index2]);
+    let v_ptr2_0 = &mut buffer_v[v_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(v_ptr2_0, cr);
 
     /* do the same again with next data */
@@ -965,7 +973,7 @@ unsafe fn rgba_to_yuv444_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr1_1 = std::mem::transmute(&mut buffer_y[y_index1 + 16]);
+    let y_ptr1_1 = &mut buffer_y[y_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr1_1, y_val);
 
     /* same for the second line, compute Y', (B-Y') and (R-Y'), in 16bits values */
@@ -981,7 +989,7 @@ unsafe fn rgba_to_yuv444_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr2_1 = std::mem::transmute(&mut buffer_y[y_index2 + 16]);
+    let y_ptr2_1 = &mut buffer_y[y_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr2_1, y_val);
     /* Rescale Cb and Cr to their final range */
     let (cb1_16, cr1_16) = rescale_uv!(param, cb1_16, cr1_16);
@@ -995,10 +1003,10 @@ unsafe fn rgba_to_yuv444_step(
     let cr = _mm_packus_epi16(cr1_16, cr2_16);
     let cr = _mm_unpackhi_epi8(_mm_slli_si128(cr, 8), cr);
 
-    let u_ptr1_1 = std::mem::transmute(&mut buffer_u[u_index1 + 16]);
+    let u_ptr1_1 = &mut buffer_u[u_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(u_ptr1_1, cb);
 
-    let v_ptr1_1 = std::mem::transmute(&mut buffer_v[v_index1 + 16]);
+    let v_ptr1_1 = &mut buffer_v[v_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(v_ptr1_1, cr);
 
     /* Pack and save Cb Cr */
@@ -1007,10 +1015,10 @@ unsafe fn rgba_to_yuv444_step(
     let cr = _mm_packus_epi16(cr3_16, cr4_16);
     let cr = _mm_unpackhi_epi8(_mm_slli_si128(cr, 8), cr);
 
-    let u_ptr2_1 = std::mem::transmute(&mut buffer_u[u_index2 + 16]);
+    let u_ptr2_1 = &mut buffer_u[u_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(u_ptr2_1, cb);
 
-    let v_ptr2_1 = std::mem::transmute(&mut buffer_v[v_index2 + 16]);
+    let v_ptr2_1 = &mut buffer_v[v_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(v_ptr2_1, cr);
 }
 
@@ -1276,13 +1284,13 @@ unsafe fn yuv420_to_rgb_step(
     u_index1: usize,
     v_index1: usize,
 ) {
-    let y_ptr1_0 = std::mem::transmute(&buffer_y[y_index1]);
-    let y_ptr2_0 = std::mem::transmute(&buffer_y[y_index2]);
-    let y_ptr1_1 = std::mem::transmute(&buffer_y[y_index1 + 16]);
-    let y_ptr2_1 = std::mem::transmute(&buffer_y[y_index2 + 16]);
+    let y_ptr1_0 = &buffer_y[y_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr2_0 = &buffer_y[y_index2] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr1_1 = &buffer_y[y_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr2_1 = &buffer_y[y_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr1 = std::mem::transmute(&buffer_u[u_index1]);
-    let v_ptr1 = std::mem::transmute(&buffer_v[v_index1]);
+    let u_ptr1 = &buffer_u[u_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr1 = &buffer_v[v_index1] as *const u8 as *const std::arch::x86_64::__m128i;
 
     let u = _mm_loadu_si128(u_ptr1);
     let v = _mm_loadu_si128(v_ptr1);
@@ -1384,12 +1392,12 @@ unsafe fn yuv420_to_rgb_step(
     let g_8_22 = _mm_packus_epi16(g_16_1, g_16_2);
     let b_8_22 = _mm_packus_epi16(b_16_1, b_16_2);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index1]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 80]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index1 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index1 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index1 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index1 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     let (rgb_1, rgb_2, rgb_3, rgb_4, rgb_5, rgb_6) =
         pack_rgb24_32(r_8_11, r_8_12, g_8_11, g_8_12, b_8_11, b_8_12);
@@ -1400,12 +1408,12 @@ unsafe fn yuv420_to_rgb_step(
     _mm_storeu_si128(rgb_ptr5, rgb_5);
     _mm_storeu_si128(rgb_ptr6, rgb_6);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index2]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 80]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index2 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index2 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index2 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index2 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     let (rgb_1, rgb_2, rgb_3, rgb_4, rgb_5, rgb_6) =
         pack_rgb24_32(r_8_21, r_8_22, g_8_21, g_8_22, b_8_21, b_8_22);
@@ -1432,13 +1440,13 @@ unsafe fn yuv420_to_rgba_step(
     u_index1: usize,
     v_index1: usize,
 ) {
-    let y_ptr1_0 = std::mem::transmute(&buffer_y[y_index1]);
-    let y_ptr2_0 = std::mem::transmute(&buffer_y[y_index2]);
-    let y_ptr1_1 = std::mem::transmute(&buffer_y[y_index1 + 16]);
-    let y_ptr2_1 = std::mem::transmute(&buffer_y[y_index2 + 16]);
+    let y_ptr1_0 = &buffer_y[y_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr2_0 = &buffer_y[y_index2] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr1_1 = &buffer_y[y_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr2_1 = &buffer_y[y_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr1 = std::mem::transmute(&buffer_u[u_index1]);
-    let v_ptr1 = std::mem::transmute(&buffer_v[v_index1]);
+    let u_ptr1 = &buffer_u[u_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr1 = &buffer_v[v_index1] as *const u8 as *const std::arch::x86_64::__m128i;
 
     let u = _mm_loadu_si128(u_ptr1);
     let v = _mm_loadu_si128(v_ptr1);
@@ -1540,14 +1548,14 @@ unsafe fn yuv420_to_rgba_step(
     let g_8_22 = _mm_packus_epi16(g_16_1, g_16_2);
     let b_8_22 = _mm_packus_epi16(b_16_1, b_16_2);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index1]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 80]);
-    let rgb_ptr7 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 96]);
-    let rgb_ptr8 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 112]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index1 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index1 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index1 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index1 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr7 = &mut buffer_rgb[rgb_index1 + 96] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr8 = &mut buffer_rgb[rgb_index1 + 112] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     let a_8_11 = _mm_set1_epi16(0xFF);
     let a_8_12 = _mm_set1_epi16(0xFF);
@@ -1563,14 +1571,14 @@ unsafe fn yuv420_to_rgba_step(
     _mm_storeu_si128(rgb_ptr7, rgb_7);
     _mm_storeu_si128(rgb_ptr8, rgb_8);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index2]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 80]);
-    let rgb_ptr7 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 96]);
-    let rgb_ptr8 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 112]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index2 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index2 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index2 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index2 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr7 = &mut buffer_rgb[rgb_index2 + 96] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr8 = &mut buffer_rgb[rgb_index2 + 112] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     let a_8_21 = _mm_set1_epi16(0xFF);
     let a_8_22 = _mm_set1_epi16(0xFF);
@@ -1791,17 +1799,17 @@ unsafe fn yuv444_to_rgb_step(
     v_index1: usize,
     v_index2: usize,
 ) {
-    let u_ptr1_0 = std::mem::transmute(&buffer_u[u_index1]);
-    let v_ptr1_0 = std::mem::transmute(&buffer_v[v_index1]);
+    let u_ptr1_0 = &buffer_u[u_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr1_0 = &buffer_v[v_index1] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr1_1 = std::mem::transmute(&buffer_u[u_index1 + 16]);
-    let v_ptr1_1 = std::mem::transmute(&buffer_v[v_index1 + 16]);
+    let u_ptr1_1 = &buffer_u[u_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr1_1 = &buffer_v[v_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr2_0 = std::mem::transmute(&buffer_u[u_index2]);
-    let v_ptr2_0 = std::mem::transmute(&buffer_v[v_index2]);
+    let u_ptr2_0 = &buffer_u[u_index2] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr2_0 = &buffer_v[v_index2] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr2_1 = std::mem::transmute(&buffer_u[u_index2 + 16]);
-    let v_ptr2_1 = std::mem::transmute(&buffer_v[v_index2 + 16]);
+    let u_ptr2_1 = &buffer_u[u_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr2_1 = &buffer_v[v_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
     let u1 = _mm_loadu_si128(u_ptr1_0);
     let u2 = _mm_loadu_si128(u_ptr2_0);
@@ -1830,7 +1838,7 @@ unsafe fn yuv444_to_rgb_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr1_0 = std::mem::transmute(&buffer_y[y_index1]);
+    let y_ptr1_0 = &buffer_y[y_index1] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr1_0);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -1861,7 +1869,7 @@ unsafe fn yuv444_to_rgb_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr2_0 = std::mem::transmute(&buffer_y[y_index2]);
+    let y_ptr2_0 = &buffer_y[y_index2] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr2_0);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -1893,7 +1901,7 @@ unsafe fn yuv444_to_rgb_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr1_1 = std::mem::transmute(&buffer_y[y_index1 + 16]);
+    let y_ptr1_1 = &buffer_y[y_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr1_1);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -1925,7 +1933,7 @@ unsafe fn yuv444_to_rgb_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr2_1 = std::mem::transmute(&buffer_y[y_index2 + 16]);
+    let y_ptr2_1 = &buffer_y[y_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr2_1);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -1942,12 +1950,12 @@ unsafe fn yuv444_to_rgb_step(
     let (rgb_1, rgb_2, rgb_3, rgb_4, rgb_5, rgb_6) =
         pack_rgb24_32(r_8_11, r_8_12, g_8_11, g_8_12, b_8_11, b_8_12);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index1]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 80]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index1 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index1 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index1 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index1 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     _mm_storeu_si128(rgb_ptr1, rgb_1);
     _mm_storeu_si128(rgb_ptr2, rgb_2);
@@ -1959,12 +1967,12 @@ unsafe fn yuv444_to_rgb_step(
     let (rgb_1, rgb_2, rgb_3, rgb_4, rgb_5, rgb_6) =
         pack_rgb24_32(r_8_21, r_8_22, g_8_21, g_8_22, b_8_21, b_8_22);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index2]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 80]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index2 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index2 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index2 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index2 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     _mm_storeu_si128(rgb_ptr1, rgb_1);
     _mm_storeu_si128(rgb_ptr2, rgb_2);
@@ -2037,17 +2045,17 @@ unsafe fn yuv444_to_rgba_step(
     v_index1: usize,
     v_index2: usize,
 ) {
-    let u_ptr1_0 = std::mem::transmute(&buffer_u[u_index1]);
-    let v_ptr1_0 = std::mem::transmute(&buffer_v[v_index1]);
+    let u_ptr1_0 = &buffer_u[u_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr1_0 = &buffer_v[v_index1] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr1_1 = std::mem::transmute(&buffer_u[u_index1 + 16]);
-    let v_ptr1_1 = std::mem::transmute(&buffer_v[v_index1 + 16]);
+    let u_ptr1_1 = &buffer_u[u_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr1_1 = &buffer_v[v_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr2_0 = std::mem::transmute(&buffer_u[u_index2]);
-    let v_ptr2_0 = std::mem::transmute(&buffer_v[v_index2]);
+    let u_ptr2_0 = &buffer_u[u_index2] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr2_0 = &buffer_v[v_index2] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let u_ptr2_1 = std::mem::transmute(&buffer_u[u_index2 + 16]);
-    let v_ptr2_1 = std::mem::transmute(&buffer_v[v_index2 + 16]);
+    let u_ptr2_1 = &buffer_u[u_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+    let v_ptr2_1 = &buffer_v[v_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
     let u1 = _mm_loadu_si128(u_ptr1_0);
     let u2 = _mm_loadu_si128(u_ptr2_0);
@@ -2076,7 +2084,7 @@ unsafe fn yuv444_to_rgba_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr1_0 = std::mem::transmute(&buffer_y[y_index1]);
+    let y_ptr1_0 = &buffer_y[y_index1] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr1_0);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -2107,7 +2115,7 @@ unsafe fn yuv444_to_rgba_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr2_0 = std::mem::transmute(&buffer_y[y_index2]);
+    let y_ptr2_0 = &buffer_y[y_index2] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr2_0);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -2139,7 +2147,7 @@ unsafe fn yuv444_to_rgba_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr1_1 = std::mem::transmute(&buffer_y[y_index1 + 16]);
+    let y_ptr1_1 = &buffer_y[y_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr1_1);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -2171,7 +2179,7 @@ unsafe fn yuv444_to_rgba_step(
     let g_16_2 = g_uv_16_2;
     let b_16_2 = b_uv_16_2;
 
-    let y_ptr2_1 = std::mem::transmute(&buffer_y[y_index2 + 16]);
+    let y_ptr2_1 = &buffer_y[y_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
     let y = _mm_loadu_si128(y_ptr2_1);
     let y = _mm_sub_epi8(y, _mm_set1_epi8(param.y_offset as i8));
     let y_16_1 = _mm_unpacklo_epi8(y, _mm_setzero_si128());
@@ -2191,14 +2199,14 @@ unsafe fn yuv444_to_rgba_step(
     let (rgb_1, rgb_2, rgb_3, rgb_4, rgb_5, rgb_6, rgb_7, rgb_8) =
         pack_r_g_b_a_to_rgb32!(r_8_11, r_8_12, g_8_11, g_8_12, b_8_11, b_8_12, a_8_11, a_8_12);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index1]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 80]);
-    let rgb_ptr7 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 96]);
-    let rgb_ptr8 = std::mem::transmute(&mut buffer_rgb[rgb_index1 + 112]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index1 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index1 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index1 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index1 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr7 = &mut buffer_rgb[rgb_index1 + 96] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr8 = &mut buffer_rgb[rgb_index1 + 112] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     _mm_storeu_si128(rgb_ptr1, rgb_1);
     _mm_storeu_si128(rgb_ptr2, rgb_2);
@@ -2215,14 +2223,14 @@ unsafe fn yuv444_to_rgba_step(
     let (rgb_1, rgb_2, rgb_3, rgb_4, rgb_5, rgb_6, rgb_7, rgb_8) =
         pack_r_g_b_a_to_rgb32!(r_8_21, r_8_22, g_8_21, g_8_22, b_8_21, b_8_22, a_8_11, a_8_12);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgb[rgb_index2]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 80]);
-    let rgb_ptr7 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 96]);
-    let rgb_ptr8 = std::mem::transmute(&mut buffer_rgb[rgb_index2 + 112]);
+    let rgb_ptr1 = &mut buffer_rgb[rgb_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgb[rgb_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgb[rgb_index2 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgb[rgb_index2 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgb[rgb_index2 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgb[rgb_index2 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr7 = &mut buffer_rgb[rgb_index2 + 96] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr8 = &mut buffer_rgb[rgb_index2 + 112] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     _mm_storeu_si128(rgb_ptr1, rgb_1);
     _mm_storeu_si128(rgb_ptr2, rgb_2);
@@ -2441,7 +2449,7 @@ unsafe fn rgba_to_nv12_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr1_0 = std::mem::transmute(&mut buffer_y[y_index1]);
+    let y_ptr1_0 = &mut buffer_y[y_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr1_0, y_val);
 
     /* same for the second line, compute Y', (B-Y') and (R-Y'), in 16bits values
@@ -2466,7 +2474,7 @@ unsafe fn rgba_to_nv12_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr2_0 = std::mem::transmute(&mut buffer_y[y_index2]);
+    let y_ptr2_0 = &mut buffer_y[y_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr2_0, y_val);
 
     /* Rescale Cb and Cr to their final range */
@@ -2506,7 +2514,7 @@ unsafe fn rgba_to_nv12_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr1_1 = std::mem::transmute(&mut buffer_y[y_index1 + 16]);
+    let y_ptr1_1 = &mut buffer_y[y_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr1_1, y_val);
 
     /* same for the second line, compute Y', (B-Y') and (R-Y'), in 16bits values */
@@ -2530,7 +2538,7 @@ unsafe fn rgba_to_nv12_step(
     let y_val = _mm_packus_epi16(y1_16, y2_16);
     let y_val = _mm_unpackhi_epi8(_mm_slli_si128(y_val, 8), y_val);
 
-    let y_ptr2_1 = std::mem::transmute(&mut buffer_y[y_index2 + 16]);
+    let y_ptr2_1 = &mut buffer_y[y_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(y_ptr2_1, y_val);
 
     /* Rescale Cb and Cr to their final range */
@@ -2546,10 +2554,10 @@ unsafe fn rgba_to_nv12_step(
     let cbcr1 = _mm_unpacklo_epi8(cb, cr);
     let cbcr2 = _mm_unpackhi_epi8(cb, cr);
 
-    let uv_ptr = std::mem::transmute(&mut buffer_uv[uv_index]);
+    let uv_ptr = &mut buffer_uv[uv_index] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(uv_ptr, cbcr1);
 
-    let uv_ptr = std::mem::transmute(&mut buffer_uv[uv_index + 16]);
+    let uv_ptr = &mut buffer_uv[uv_index + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
     _mm_storeu_si128(uv_ptr, cbcr2);
 }
 
@@ -2730,13 +2738,13 @@ unsafe fn nv12_to_rgba_step(
     y_index2: usize,
     uv_index: usize,
 ) {
-    let y_ptr1_0 = std::mem::transmute(&buffer_y[y_index1]);
-    let y_ptr2_0 = std::mem::transmute(&buffer_y[y_index2]);
-    let y_ptr1_1 = std::mem::transmute(&buffer_y[y_index1 + 16]);
-    let y_ptr2_1 = std::mem::transmute(&buffer_y[y_index2 + 16]);
+    let y_ptr1_0 = &buffer_y[y_index1] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr2_0 = &buffer_y[y_index2] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr1_1 = &buffer_y[y_index1 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
+    let y_ptr2_1 = &buffer_y[y_index2 + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
-    let uv_ptr1 = std::mem::transmute(&buffer_uv[uv_index]);
-    let uv_ptr2 = std::mem::transmute(&buffer_uv[uv_index + 16]);
+    let uv_ptr1 = &buffer_uv[uv_index] as *const u8 as *const std::arch::x86_64::__m128i;
+    let uv_ptr2 = &buffer_uv[uv_index + 16] as *const u8 as *const std::arch::x86_64::__m128i;
 
     let uv1 = _mm_loadu_si128(uv_ptr1);
     let uv2 = _mm_loadu_si128(uv_ptr2);
@@ -2849,14 +2857,15 @@ unsafe fn nv12_to_rgba_step(
     let g_8_22 = _mm_packus_epi16(g_16_1, g_16_2);
     let b_8_22 = _mm_packus_epi16(b_16_1, b_16_2);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgba[rgba_index1]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgba[rgba_index1 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgba[rgba_index1 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgba[rgba_index1 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgba[rgba_index1 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgba[rgba_index1 + 80]);
-    let rgb_ptr7 = std::mem::transmute(&mut buffer_rgba[rgba_index1 + 96]);
-    let rgb_ptr8 = std::mem::transmute(&mut buffer_rgba[rgba_index1 + 112]);
+    let rgb_ptr1 = &mut buffer_rgba[rgba_index1] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgba[rgba_index1 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgba[rgba_index1 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgba[rgba_index1 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgba[rgba_index1 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgba[rgba_index1 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr7 = &mut buffer_rgba[rgba_index1 + 96] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr8 =
+        &mut buffer_rgba[rgba_index1 + 112] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     let a_8_11 = _mm_set1_epi16(0xFF);
     let a_8_12 = _mm_set1_epi16(0xFF);
@@ -2872,14 +2881,15 @@ unsafe fn nv12_to_rgba_step(
     _mm_storeu_si128(rgb_ptr7, rgb_7);
     _mm_storeu_si128(rgb_ptr8, rgb_8);
 
-    let rgb_ptr1 = std::mem::transmute(&mut buffer_rgba[rgba_index2]);
-    let rgb_ptr2 = std::mem::transmute(&mut buffer_rgba[rgba_index2 + 16]);
-    let rgb_ptr3 = std::mem::transmute(&mut buffer_rgba[rgba_index2 + 32]);
-    let rgb_ptr4 = std::mem::transmute(&mut buffer_rgba[rgba_index2 + 48]);
-    let rgb_ptr5 = std::mem::transmute(&mut buffer_rgba[rgba_index2 + 64]);
-    let rgb_ptr6 = std::mem::transmute(&mut buffer_rgba[rgba_index2 + 80]);
-    let rgb_ptr7 = std::mem::transmute(&mut buffer_rgba[rgba_index2 + 96]);
-    let rgb_ptr8 = std::mem::transmute(&mut buffer_rgba[rgba_index2 + 112]);
+    let rgb_ptr1 = &mut buffer_rgba[rgba_index2] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr2 = &mut buffer_rgba[rgba_index2 + 16] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr3 = &mut buffer_rgba[rgba_index2 + 32] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr4 = &mut buffer_rgba[rgba_index2 + 48] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr5 = &mut buffer_rgba[rgba_index2 + 64] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr6 = &mut buffer_rgba[rgba_index2 + 80] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr7 = &mut buffer_rgba[rgba_index2 + 96] as *mut u8 as *mut std::arch::x86_64::__m128i;
+    let rgb_ptr8 =
+        &mut buffer_rgba[rgba_index2 + 112] as *mut u8 as *mut std::arch::x86_64::__m128i;
 
     let a_8_21 = _mm_set1_epi16(0xFF);
     let a_8_22 = _mm_set1_epi16(0xFF);
