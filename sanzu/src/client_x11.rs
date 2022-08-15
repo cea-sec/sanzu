@@ -1,6 +1,6 @@
 use crate::{
     client_utils::{Area, Client},
-    utils::{ArgumentsClient, ClipboardSelection},
+    utils::{ArgumentsClient, ClipboardConfig, ClipboardSelection},
     utils_x11,
 };
 use anyhow::{Context, Result};
@@ -36,10 +36,12 @@ use x11rb::{
     COPY_DEPTH_FROM_PARENT,
 };
 
+/// xkbprint -color -kc :0 - | ps2pdf - > xkbprint.pdf
 const KEY_CTRL: usize = 37;
 const KEY_SHIFT: usize = 50;
 const KEY_ALT: usize = 64;
 const KEY_S: usize = 39;
+const KEY_C: usize = 54;
 
 struct FreePixmap<'c, C: Connection>(&'c C, Pixmap);
 impl<C: Connection> Drop for FreePixmap<'_, C> {
@@ -115,14 +117,18 @@ pub struct ClientInfo {
     pub seamless: bool,
     /// Clipboard instance,
     pub clipboard: Clipboard,
-    /// Restrict Clipboard: false if not allowed to send local clipboard
-    pub restrict_clipboard: bool,
+    /// Clipboard behavior
+    pub clipboard_config: ClipboardConfig,
     /// Clipboard event receiver
     pub clipboard_event_receiver: Receiver<String>,
+    /// Last seen clipboard value
+    pub clipboard_last_value: Option<String>,
     /// store clipboard events to skip
     pub skip_clipboard_primary: Arc<Mutex<u32>>,
     pub skip_clipboard_clipboard: Arc<Mutex<u32>>,
     pub display_stats: bool,
+    /// Bool to trig clipboard send
+    pub clipbard_trig: bool,
 }
 
 fn create_gc<C: Connection>(
@@ -326,25 +332,28 @@ pub fn init_x11rb(
     let skip_clipboard_primary_thread = skip_clipboard_primary.clone();
     let skip_clipboard_clipboard_thread = skip_clipboard_clipboard.clone();
 
-    if !arguments.restrict_clipboard {
-        // Listen "primary" clipboard events
-        thread::spawn(move || {
-            listen_clipboard(
-                ClipboardSelection::Primary,
-                selection_sender_primary,
-                skip_clipboard_primary_thread,
-            );
-        });
+    match arguments.clipboard_config {
+        ClipboardConfig::Allow | ClipboardConfig::Trig => {
+            // Listen "primary" clipboard events
+            thread::spawn(move || {
+                listen_clipboard(
+                    ClipboardSelection::Primary,
+                    selection_sender_primary,
+                    skip_clipboard_primary_thread,
+                );
+            });
 
-        // Listen "clipboard" clipboard events
-        thread::spawn(move || {
-            listen_clipboard(
-                ClipboardSelection::Clipboard,
-                selection_sender_clipboard,
-                skip_clipboard_clipboard_thread,
-            );
-        });
-    }
+            // Listen "clipboard" clipboard events
+            thread::spawn(move || {
+                listen_clipboard(
+                    ClipboardSelection::Clipboard,
+                    selection_sender_clipboard,
+                    skip_clipboard_clipboard_thread,
+                );
+            });
+        }
+        _ => {}
+    };
 
     /* randr extension to detect screen resolution changes */
     conn.extension_information(randr::X11_EXTENSION_NAME)
@@ -377,11 +386,13 @@ pub fn init_x11rb(
         need_update: true,
         seamless,
         clipboard,
-        restrict_clipboard: arguments.restrict_clipboard,
+        clipboard_config: arguments.clipboard_config,
         clipboard_event_receiver,
+        clipboard_last_value: None,
         skip_clipboard_primary,
         skip_clipboard_clipboard,
         display_stats: false,
+        clipbard_trig: false,
     };
 
     Ok(Box::new(client_info))
@@ -726,7 +737,6 @@ impl Client for ClientInfo {
     fn poll_events(&mut self) -> Result<tunnel::MessagesClient> {
         let mut events = vec![];
         let mut last_move = None;
-        let mut last_clipboard = None;
         let mut last_resize = None;
         self.need_update = false;
         while let Some(event) = self
@@ -788,6 +798,17 @@ impl Client for ClientInfo {
                         {
                             self.display_stats = !self.display_stats;
                             info!("Toggle server logs");
+                        }
+                    }
+
+                    // If Ctrl alt shift c => Trig clipboard event
+                    if event.detail == KEY_C as u8 {
+                        // Ctrl Shift Alt
+                        if self.keys_state[KEY_CTRL]
+                            && self.keys_state[KEY_SHIFT]
+                            && self.keys_state[KEY_ALT]
+                        {
+                            self.clipbard_trig = true;
                         }
                     }
 
@@ -874,10 +895,7 @@ impl Client for ClientInfo {
 
         /* Get clipboard events */
         if let Some(data) = get_clipboard_events(&self.clipboard_event_receiver) {
-            let eventclipboard = tunnel::EventClipboard { data };
-            last_clipboard = Some(tunnel::MessageClient {
-                msg: Some(tunnel::message_client::Msg::Clipboard(eventclipboard)),
-            });
+            self.clipboard_last_value = Some(data);
         }
 
         if let Some(last_move) = last_move {
@@ -886,8 +904,33 @@ impl Client for ClientInfo {
         if let Some(last_resize) = last_resize {
             events.push(last_resize);
         }
-        if let Some(last_clipboard) = last_clipboard {
-            events.push(last_clipboard);
+
+        match self.clipboard_config {
+            ClipboardConfig::Deny => {}
+
+            ClipboardConfig::Allow => {
+                if let Some(data) = self.clipboard_last_value.take() {
+                    let eventclipboard = tunnel::EventClipboard { data };
+                    let clipboard_msg = tunnel::MessageClient {
+                        msg: Some(tunnel::message_client::Msg::Clipboard(eventclipboard)),
+                    };
+                    events.push(clipboard_msg);
+                }
+            }
+
+            ClipboardConfig::Trig => {
+                if let (true, Some(ref data)) = (self.clipbard_trig, &self.clipboard_last_value) {
+                    // If we triggered clipboard send and the clipboard is not empty
+                    let eventclipboard = tunnel::EventClipboard {
+                        data: data.to_owned(),
+                    };
+                    let clipboard_msg = tunnel::MessageClient {
+                        msg: Some(tunnel::message_client::Msg::Clipboard(eventclipboard)),
+                    };
+                    events.push(clipboard_msg);
+                }
+                self.clipbard_trig = false;
+            }
         }
 
         Ok(tunnel::MessagesClient { msgs: events })

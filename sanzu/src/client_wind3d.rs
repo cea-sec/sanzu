@@ -1,6 +1,6 @@
 use crate::{
     client_utils::{Area, Client},
-    utils::ArgumentsClient,
+    utils::{ArgumentsClient, ClipboardConfig},
     utils_win,
 };
 use anyhow::{Context, Result};
@@ -87,15 +87,20 @@ lazy_static! {
     static ref SHAPE_RECEIVER: Mutex<Option<Receiver<Vec<Area>>>> = Mutex::new(None);
     static ref KEYS_STATE: Mutex<Vec<bool>> = Mutex::new(vec![false; 0x100]);
     static ref DISPLAY_STATS: atomic::AtomicBool = atomic::AtomicBool::new(false);
+    static ref CLIPBOARD_TRIG: atomic::AtomicBool = atomic::AtomicBool::new(false);
     static ref WINDOW_RECEIVER: Mutex<Option<Receiver<AreaManager>>> = Mutex::new(None);
     static ref WINDOW_SENDER: Mutex<Option<Sender<AreaManager>>> = Mutex::new(None);
     static ref MSG_SENDER: Mutex<Option<Sender<u64>>> = Mutex::new(None);
 }
 
+/// Windows keycodes come from raw usb hid keycodes,
+/// then transformed to xkb keycodes
+/// xkbprint -color -kc :0 - | ps2pdf - > xkbprint.pdf
 const KEY_CTRL: usize = 37;
 const KEY_SHIFT: usize = 50;
 const KEY_ALT: usize = 64;
 const KEY_S: usize = 39;
+const KEY_C: usize = 54;
 
 const WM_UPDATE_FRAME: UINT = WM_USER + 1;
 const WM_WTSSESSION_CHANGE: DWORD = 0x2B1;
@@ -217,14 +222,15 @@ pub struct ClientWindows {
     pub cur_areas: Vec<Area>,
     pub width: u16,
     pub height: u16,
-    pub restrict_clipboard: bool,
+    pub clipboard_config: ClipboardConfig,
+    pub clipboard_last_value: Option<String>,
     pub printdir: Option<String>,
 }
 
 impl ClientWindows {
     pub fn build(
         server_size: Option<(u16, u16)>,
-        restrict_clipboard: bool,
+        clipboard_config: ClipboardConfig,
         printdir: Option<String>,
     ) -> (
         ClientWindows,
@@ -259,7 +265,8 @@ impl ClientWindows {
             cur_areas: vec![],
             width,
             height,
-            restrict_clipboard,
+            clipboard_config,
+            clipboard_last_value: None,
             printdir,
         };
 
@@ -609,6 +616,15 @@ extern "system" fn custom_wnd_proc(
                         let display_stats = DISPLAY_STATS.load(atomic::Ordering::Acquire);
                         DISPLAY_STATS.store(!display_stats, atomic::Ordering::Release);
                         info!("Toggle server logs");
+                    }
+                }
+
+                // If Ctrl alt shift c => Trig clipboard event
+                if keycode == KEY_C as u16 && updown {
+                    // Ctrl Shift Alt
+                    let keys_state = KEYS_STATE.lock().unwrap();
+                    if keys_state[KEY_CTRL] && keys_state[KEY_SHIFT] && keys_state[KEY_ALT] {
+                        CLIPBOARD_TRIG.store(true, atomic::Ordering::Release);
                     }
                 }
 
@@ -987,7 +1003,7 @@ pub fn init_wind3d(
     let (client_info, frame_receiver, event_sender, cursor_receiver, shape_receiver) =
         ClientWindows::build(
             server_size,
-            argumets.restrict_clipboard,
+            argumets.clipboard_config,
             argumets.printdir.map(|printdir| printdir.to_string()),
         );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
@@ -1409,12 +1425,11 @@ impl Client for ClientWindows {
                 event @ tunnel::MessageClient {
                     msg: Some(tunnel::message_client::Msg::Move { .. }),
                 } => last_move = Some(event),
-                event @ tunnel::MessageClient {
-                    msg: Some(tunnel::message_client::Msg::Clipboard { .. }),
+                tunnel::MessageClient {
+                    msg:
+                        Some(tunnel::message_client::Msg::Clipboard(tunnel::EventClipboard { data })),
                 } => {
-                    if !self.restrict_clipboard {
-                        events.push(event)
-                    }
+                    self.clipboard_last_value = Some(data);
                 }
                 _ => events.push(event),
             }
@@ -1422,6 +1437,37 @@ impl Client for ClientWindows {
 
         if let Some(event) = last_move {
             events.push(event)
+        }
+
+        match self.clipboard_config {
+            ClipboardConfig::Deny => {}
+
+            ClipboardConfig::Allow => {
+                if let Some(data) = self.clipboard_last_value.take() {
+                    let eventclipboard = tunnel::EventClipboard { data };
+                    let clipboard_msg = tunnel::MessageClient {
+                        msg: Some(tunnel::message_client::Msg::Clipboard(eventclipboard)),
+                    };
+                    events.push(clipboard_msg);
+                }
+            }
+
+            ClipboardConfig::Trig => {
+                if let (true, Some(ref data)) = (
+                    CLIPBOARD_TRIG.load(atomic::Ordering::Acquire),
+                    &self.clipboard_last_value,
+                ) {
+                    // If we triggered clipboard send and the clipboard is not empty
+                    let eventclipboard = tunnel::EventClipboard {
+                        data: data.to_owned(),
+                    };
+                    let clipboard_msg = tunnel::MessageClient {
+                        msg: Some(tunnel::message_client::Msg::Clipboard(eventclipboard)),
+                    };
+                    events.push(clipboard_msg);
+                }
+                CLIPBOARD_TRIG.store(false, atomic::Ordering::Release);
+            }
         }
 
         Ok(tunnel::MessagesClient { msgs: events })
