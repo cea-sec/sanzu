@@ -692,12 +692,8 @@ pub fn init_d3d11() -> Result<()> {
         for monitor in monitor_infos {
             info!("Monitor!");
             info!(
-                "Info name {:?} coord {:?} AttachedToDesktop {:?} Rotation {:?} Monitor {:?}",
-                monitor.DeviceName,
-                monitor.DesktopCoordinates,
-                monitor.AttachedToDesktop,
-                monitor.Rotation,
-                monitor.Monitor,
+                "Info name {:?} AttachedToDesktop {:?} Rotation {:?} Monitor {:?}",
+                monitor.DeviceName, monitor.AttachedToDesktop, monitor.Rotation, monitor.Monitor,
             );
         }
 
