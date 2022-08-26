@@ -12,6 +12,8 @@ use clipboard_win::{formats, get_clipboard, set_clipboard};
 use sanzu_common::tunnel;
 
 use std::{
+    cmp::Ordering,
+    collections::HashMap,
     ffi::CString,
     ptr::null_mut,
     sync::{
@@ -30,8 +32,8 @@ use winapi::{
     shared::{
         dxgi, dxgi1_2, dxgitype,
         guiddef::GUID,
-        minwindef::{LPARAM, LRESULT, UINT, WPARAM},
-        windef::HWND,
+        minwindef::{BOOL, LPARAM, LRESULT, UINT, WPARAM},
+        windef::{HWND, RECT},
         winerror::{DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_WAIT_TIMEOUT, SUCCEEDED},
     },
     um::{
@@ -39,14 +41,16 @@ use winapi::{
         libloaderapi::GetModuleHandleA,
         wingdi::{GetDeviceCaps, HORZRES, VERTRES},
         winuser::{
-            CreateWindowExA, DefWindowProcA, DispatchMessageA, GetDC, PeekMessageA,
-            RegisterClassExA, SendInput, SetClipboardViewer, TranslateMessage, INPUT,
-            INPUT_KEYBOARD, INPUT_MOUSE, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP,
-            KEYEVENTF_SCANCODE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP,
-            MOUSEEVENTF_MIDDLEDOWN, MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN,
-            MOUSEEVENTF_RIGHTUP, MOUSEEVENTF_WHEEL, MSG, PM_REMOVE, WM_DRAWCLIPBOARD, WM_KILLFOCUS,
-            WM_QUIT, WM_SETFOCUS, WNDCLASSEXA, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_DLGFRAME,
-            WS_POPUP,
+            CreateWindowExA, DefWindowProcA, DispatchMessageA, EnumWindows, GetDC,
+            GetSystemMetrics, GetWindowInfo, GetWindowLongA, GetWindowRect, GetWindowTextA,
+            GetWindowTextLengthA, IsIconic, IsWindowVisible, PeekMessageA, RegisterClassExA,
+            SendInput, SetClipboardViewer, TranslateMessage, GWL_EXSTYLE, INPUT, INPUT_KEYBOARD,
+            INPUT_MOUSE, KEYEVENTF_EXTENDEDKEY, KEYEVENTF_KEYUP, KEYEVENTF_SCANCODE,
+            MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP, MOUSEEVENTF_MIDDLEDOWN,
+            MOUSEEVENTF_MIDDLEUP, MOUSEEVENTF_MOVE, MOUSEEVENTF_RIGHTDOWN, MOUSEEVENTF_RIGHTUP,
+            MOUSEEVENTF_WHEEL, MSG, PM_REMOVE, SM_CXSIZEFRAME, WINDOWINFO, WM_DRAWCLIPBOARD,
+            WM_KILLFOCUS, WM_QUIT, WM_SETFOCUS, WNDCLASSEXA, WS_CLIPCHILDREN, WS_CLIPSIBLINGS,
+            WS_DLGFRAME, WS_EX_TOOLWINDOW, WS_POPUP,
         },
     },
 };
@@ -75,6 +79,63 @@ pub struct ServerInfo {
     pub event_receiver: Receiver<tunnel::MessageSrv>,
 }
 
+#[derive(Debug)]
+pub struct Area {
+    pub drawable: usize,
+    pub position: (i16, i16),
+    pub size: (u16, u16),
+    pub mapped: bool,
+}
+
+impl Eq for Area {}
+
+impl Ord for Area {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let ret = self.drawable.cmp(&other.drawable);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+
+        let ret = self.size.cmp(&other.size);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        let ret = self.position.cmp(&other.position);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        self.mapped.cmp(&other.mapped)
+    }
+}
+
+impl PartialEq for Area {
+    fn eq(&self, other: &Self) -> bool {
+        self.drawable == other.drawable
+            && self.position == other.position
+            && self.size == other.size
+            && self.mapped == other.mapped
+    }
+}
+
+impl PartialOrd for Area {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let ret = self.drawable.partial_cmp(&other.drawable);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+
+        let ret = self.size.partial_cmp(&other.size);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        let ret = self.position.partial_cmp(&other.position);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        self.mapped.partial_cmp(&other.mapped)
+    }
+}
+
 lazy_static! {
     static ref P_DIRECT3D_DEVICE: atomic::AtomicPtr<d3d11::ID3D11Device> =
         atomic::AtomicPtr::new(null_mut());
@@ -88,6 +149,7 @@ lazy_static! {
         atomic::AtomicPtr::new(null_mut());
     static ref SURFACE_MAP_ADDR: atomic::AtomicPtr<u8> = atomic::AtomicPtr::new(null_mut());
     static ref SURFACE_MAP_PITCH: atomic::AtomicI32 = atomic::AtomicI32::new(0);
+    static ref AREAS: Mutex<HashMap<usize, Area>> = Mutex::new(HashMap::new());
 }
 
 extern "system" fn custom_wnd_proc(
@@ -128,6 +190,73 @@ extern "system" fn custom_wnd_proc(
         }
     }
     unsafe { DefWindowProcA(hwnd, msg, wparam, lparam) }
+}
+
+extern "system" fn enum_window_callback(hwnd: HWND, _l_param: LPARAM) -> BOOL {
+    let is_visible = unsafe { IsWindowVisible(hwnd) };
+
+    // Skip if windows is not visible
+    if is_visible == 0 {
+        return 1;
+    }
+
+    let ex_style = unsafe { GetWindowLongA(hwnd, GWL_EXSTYLE) } as u32;
+
+    // Skip if windows a tool window
+    if ex_style & WS_EX_TOOLWINDOW != 0 {
+        return 1;
+    }
+
+    let is_iconic = unsafe { IsIconic(hwnd) };
+
+    // Skip if windows is iconic
+    if is_iconic != 0 {
+        return 1;
+    }
+
+    let text_length = unsafe { GetWindowTextLengthA(hwnd) };
+    let mut buffer = vec![0u8; text_length as usize + 1];
+    unsafe {
+        GetWindowTextA(hwnd, buffer.as_mut_ptr() as *mut i8, text_length + 1);
+    };
+    let title = String::from_utf8_lossy(&buffer);
+    let is_filtered = title == "Windows Shell Experience Host\0" || title == "\0";
+
+    // HACK: Skip if windows is Shell experience Host or has no title
+    if is_filtered {
+        return 1;
+    }
+
+    let mut rect_win = RECT::default();
+
+    let _ = unsafe { GetWindowRect(hwnd, &mut rect_win) };
+
+    let (win_x, win_y) = (rect_win.left, rect_win.top);
+    let win_w = rect_win.right - rect_win.left;
+    let win_h = rect_win.bottom - rect_win.top;
+
+    let mut win_info = WINDOWINFO::default();
+
+    let _ = unsafe { GetWindowInfo(hwnd, &mut win_info) };
+
+    let border_thickness = unsafe { GetSystemMetrics(SM_CXSIZEFRAME) };
+
+    // Remove border (left, right, bottom)
+    // Also add 1 pixel to the border to get window state rectangle
+    let win_w = win_w - (border_thickness as i32) * 2 + 2;
+    let win_h = win_h - border_thickness as i32 + 1;
+    let win_x = win_x + (border_thickness as i32) - 1;
+
+    let area = Area {
+        drawable: hwnd as usize,
+        position: (win_x as i16, win_y as i16),
+        size: (win_w as u16, win_h as u16),
+        mapped: true,
+    };
+
+    AREAS.lock().unwrap().insert(hwnd as usize, area);
+
+    1
 }
 
 fn set_mouse_position(server_info: &mut ServerInfo, event_x: u32, event_y: u32) {
@@ -563,12 +692,8 @@ pub fn init_d3d11() -> Result<()> {
         for monitor in monitor_infos {
             info!("Monitor!");
             info!(
-                "Info name {:?} coord {:?} AttachedToDesktop {:?} Rotation {:?} Monitor {:?}",
-                monitor.DeviceName,
-                monitor.DesktopCoordinates,
-                monitor.AttachedToDesktop,
-                monitor.Rotation,
-                monitor.Monitor,
+                "Info name {:?} AttachedToDesktop {:?} Rotation {:?} Monitor {:?}",
+                monitor.DeviceName, monitor.AttachedToDesktop, monitor.Rotation, monitor.Monitor,
             );
         }
 
@@ -829,6 +954,26 @@ impl Server for ServerInfo {
         let mut events = vec![];
         while let Ok(event) = self.event_receiver.try_recv() {
             events.push(event);
+        }
+
+        AREAS.lock().unwrap().clear();
+
+        let _ = unsafe { EnumWindows(Some(enum_window_callback), 0) };
+
+        for (index, area) in AREAS.lock().unwrap().iter() {
+            let area_new = tunnel::EventAreaUpdt {
+                id: *index as u32,
+                x: area.position.0 as i32,
+                y: area.position.1 as i32,
+                width: area.size.0 as u32,
+                height: area.size.1 as u32,
+                mapped: area.mapped,
+            };
+            let event_area_updt = tunnel::message_srv::Msg::AreaUpdt(area_new);
+            let event_area_updt = tunnel::MessageSrv {
+                msg: Some(event_area_updt),
+            };
+            events.push(event_area_updt);
         }
 
         Ok(events)
