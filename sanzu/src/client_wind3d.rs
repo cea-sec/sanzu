@@ -91,6 +91,7 @@ lazy_static! {
     static ref WINDOW_RECEIVER: Mutex<Option<Receiver<AreaManager>>> = Mutex::new(None);
     static ref WINDOW_SENDER: Mutex<Option<Sender<AreaManager>>> = Mutex::new(None);
     static ref MSG_SENDER: Mutex<Option<Sender<u64>>> = Mutex::new(None);
+    static ref SKIP_CLIPBOARD: Mutex<u32> = Mutex::new(0);
 }
 
 /// Windows keycodes come from raw usb hid keycodes,
@@ -772,19 +773,25 @@ extern "system" fn custom_wnd_proc(
         WM_DRAWCLIPBOARD => {
             info!("clipboard draw");
             if let Ok(data) = get_clipboard(formats::Unicode) {
-                trace!("Send clipboard {}", data);
+                let mut skip_clipboard_guard = SKIP_CLIPBOARD.lock().unwrap();
+                if *skip_clipboard_guard > 0 {
+                    *skip_clipboard_guard -= 1;
+                    // The clipboard may be set by ourself, skip it
+                } else {
+                    trace!("Send clipboard {}", data);
 
-                let eventclipboard = tunnel::EventClipboard { data };
-                let msg_event = tunnel::MessageClient {
-                    msg: Some(tunnel::message_client::Msg::Clipboard(eventclipboard)),
-                };
-                EVENT_SENDER
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .unwrap()
-                    .send(msg_event)
-                    .expect("Error in send EventClipboard");
+                    let eventclipboard = tunnel::EventClipboard { data };
+                    let msg_event = tunnel::MessageClient {
+                        msg: Some(tunnel::message_client::Msg::Clipboard(eventclipboard)),
+                    };
+                    EVENT_SENDER
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap()
+                        .send(msg_event)
+                        .expect("Error in send EventClipboard");
+                }
             }
         }
         WM_CHANGECBCHAIN => {
@@ -1411,6 +1418,7 @@ impl Client for ClientWindows {
     }
 
     fn set_clipboard(&mut self, data: &str) -> Result<()> {
+        *SKIP_CLIPBOARD.lock().unwrap() += 1;
         set_clipboard(formats::Unicode, data)
             .map_err(|err| anyhow!("Err {:?}", err))
             .context("Cannot set clipboard")?;
