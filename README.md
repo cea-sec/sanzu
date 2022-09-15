@@ -14,3 +14,14 @@ This repository contains:
 - sanzu-common: common code
 - demo: demo code to quickly build and run sanzu
 - build: docker scripts to build sanzu packages for several distributions
+
+## Dependencies
+
+To build sanzu, the following packages are required:
+
+* `libkrb5-dev`
+* `libpam0g-dev`
+* `libavutil-dev`
+* `libavformat-dev`
+* `libavfilter-dev`
+* `libavdevice-dev`
