@@ -295,7 +295,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
         /* recv client hello with audio bool */
         let msg: tunnel::ClientHelloResolution =
             recv_client_msg_type!(&mut sock, Clienthelloresolution)
-                .context("Error in recv client hello resoltuion")?;
+                .context("Error in recv client hello resolution")?;
 
         info!("Client screen size {:?}x{:?}", msg.width, msg.height);
         let client_screen_size = Some((msg.width as u16, msg.height as u16));
