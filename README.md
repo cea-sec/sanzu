@@ -14,3 +14,5 @@ This repository contains:
 - sanzu-common: common code
 - demo: demo code to quickly build and run sanzu
 - build: docker scripts to build sanzu packages for several distributions
+
+Here is the README which explains how to run the client/server manually: [Sanzu Readme](sanzu/README.md)
