@@ -137,7 +137,7 @@ macro_rules! send_srv_msg_type {
 }
 
 pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
-    let codec_name = get_encoder_category(arguments.encoder_name)?;
+    let codec_name = get_encoder_category(&arguments.encoder_name)?;
 
     let mut sound_encoder = opus::Encoder::new(
         SOUND_FREQ as u32,
@@ -146,7 +146,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
     )
     .expect("Cannot create sound encoder");
 
-    let video_shared_mem = match arguments.video_shared_mem {
+    let video_shared_mem = match arguments.video_shared_mem.as_deref() {
         Some(shared_mem_file) => {
             let file = fs::File::open(&shared_mem_file)
                 .context(format!("Error in open shared mem {:?}", shared_mem_file))?;
@@ -162,30 +162,30 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
     };
 
     /* wait for client */
-    let mut client: Box<dyn ReadWrite> = match (arguments.listen_port, arguments.unix_socket) {
-        (listen_port, None) => {
-            let listen_port = listen_port.unwrap_or(1122);
-            let listener =
-                TcpListener::bind(SocketAddr::new(arguments.listen_address, listen_port)).context(
-                    format!(
-                        "Error in Tcp bind {:?} {:?}",
-                        arguments.listen_address, listen_port
-                    ),
-                )?;
-            let (client, addr) = listener.accept().context("failed to accept connection")?;
-            info!("Client {:?}", addr);
-            client.set_nodelay(true).context("Error in set_nodelay")?;
-            Box::new(client)
-        }
-        (None, Some(unix_socket)) => {
-            let client = UnixStream::connect(unix_socket)
-                .context(format!("Error in connect to unix socket {:?}", unix_socket))?;
-            Box::new(client)
-        }
-        _ => {
-            panic!("Choose between listen port and liten unix path");
-        }
-    };
+    let mut client: Box<dyn ReadWrite> =
+        match (arguments.listen_port, arguments.unix_socket.as_deref()) {
+            (listen_port, None) => {
+                let listen_port = listen_port.unwrap_or(1122);
+                let listener =
+                    TcpListener::bind(SocketAddr::new(arguments.listen_address, listen_port))
+                        .context(format!(
+                            "Error in Tcp bind {:?} {:?}",
+                            arguments.listen_address, listen_port
+                        ))?;
+                let (client, addr) = listener.accept().context("failed to accept connection")?;
+                info!("Client {:?}", addr);
+                client.set_nodelay(true).context("Error in set_nodelay")?;
+                Box::new(client)
+            }
+            (None, Some(unix_socket)) => {
+                let client = UnixStream::connect(unix_socket)
+                    .context(format!("Error in connect to unix socket {:?}", unix_socket))?;
+                Box::new(client)
+            }
+            _ => {
+                panic!("Choose between listen port and liten unix path");
+            }
+        };
 
     /* Connect to server */
     let mut server: Box<dyn ReadWrite> = if arguments.vsock {
@@ -298,9 +298,9 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
     };
 
     let mut video_encoder = init_video_encoder(
-        arguments.encoder_name,
+        arguments.encoder_name.as_str(),
         config.ffmpeg_options(None),
-        config.ffmpeg_options(Some(arguments.encoder_name)),
+        config.ffmpeg_options(Some(arguments.encoder_name.as_str())),
         &config.video.ffmpeg_options_cmd,
         (screen_size.0 as u16, screen_size.1 as u16),
     )?;
@@ -421,9 +421,9 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
                     if width != screen_size.0 as u32 || height != screen_size.1 as u32 {
                         debug!("Resolution change {}x{}", width, height);
                         video_encoder = init_video_encoder(
-                            arguments.encoder_name,
+                            &arguments.encoder_name,
                             config.ffmpeg_options(None),
-                            config.ffmpeg_options(Some(arguments.encoder_name)),
+                            config.ffmpeg_options(Some(arguments.encoder_name.as_str())),
                             &config.video.ffmpeg_options_cmd,
                             (width as u16, height as u16),
                         )

@@ -246,7 +246,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
             }
         }
     }
-    let codec_name = get_encoder_category(arguments.encoder_name)?;
+    let codec_name = get_encoder_category(&arguments.encoder_name)?;
 
     /* Send server hello with image info & codec name */
     let (mut server_info, audio_sample_rate) = if arguments.keep_server_resolution {
@@ -323,9 +323,9 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
     };
 
     let mut video_encoder: Box<dyn Encoder> = init_video_encoder(
-        arguments.encoder_name,
+        arguments.encoder_name.as_str(),
         config.ffmpeg_options(None),
-        config.ffmpeg_options(Some(arguments.encoder_name)),
+        config.ffmpeg_options(Some(arguments.encoder_name.as_str())),
         &config.video.ffmpeg_options_cmd,
         server_info.size(),
     )
