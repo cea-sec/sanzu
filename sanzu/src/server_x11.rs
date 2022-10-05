@@ -775,7 +775,7 @@ pub fn init_x11rb(
         &conn,
         screen,
         arguments.export_video_pci,
-        arguments.extern_img_source.map(|path| path.to_string()),
+        arguments.extern_img_source.clone(),
         config,
         width,
         height,
@@ -886,7 +886,7 @@ pub fn init_x11rb(
             );
         });
     }
-    let extern_img_source = arguments.extern_img_source.map(|path| path.to_string());
+    let extern_img_source = arguments.extern_img_source.clone();
 
     let server = ServerX11 {
         conn,

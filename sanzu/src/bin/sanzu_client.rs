@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use clap::{Arg, Command, PossibleValue};
+use clap::{builder::PossibleValue, Arg, ArgAction, Command};
 
 use sanzu::{
     client,
@@ -32,7 +32,7 @@ RUST_LOG=info
 
     let app = Command::new("Sanzu client")
         .version("0.1.0")
-        .about(about.as_str())
+        .about(about)
         .arg(
             Arg::new("ip")
                 .help("Sets the server IP (Ex: 127.0.0.1)")
@@ -41,8 +41,9 @@ RUST_LOG=info
         )
         .arg(
             Arg::new("port")
-                .help("Sets the server port (Ex: 122)")
+                .help("Sets the server port (Ex: 1122)")
                 .required(true)
+                .value_parser(clap::value_parser!(u16))
                 .index(2),
         )
         .arg(
@@ -50,63 +51,64 @@ RUST_LOG=info
                 .short('f')
                 .long("config")
                 .help("configuration file")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("audio")
                 .help("Forward audio")
                 .short('a')
                 .long("audio")
-                .takes_value(false),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("tls_ca")
                 .help("Enable tls encryption / server authentication")
                 .short('t')
                 .long("tls_ca")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("tls_server_name")
                 .help("Server name for tls tunnel")
                 .short('n')
                 .long("tls_server_name")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("client_cert")
                 .help("Use client cert authentication")
                 .short('c')
                 .long("client_cert")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("client_key")
                 .help("Client cert key")
                 .short('x')
                 .long("client_key")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("audio_buffer_ms")
                 .help("Audio buffer ms (default: 150ms)")
                 .short('b')
                 .long("audio_buffer_ms")
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("audio_sample_rate")
                 .help("Audio sample rate")
                 .short('s')
                 .long("audio_sample_rate")
-                .takes_value(true),
+                .value_parser(clap::value_parser!(u32))
+                .num_args(1),
         )
         .arg(
             Arg::new("login")
                 .help("Use login/password to authenticate")
                 .short('l')
                 .long("login")
-                .takes_value(false),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("clipboard")
@@ -117,7 +119,7 @@ RUST_LOG=info
 "#)
                 .short('q')
                 .long("clipboard")
-                .takes_value(true)
+                .num_args(1)
                 .default_missing_value("allow")
                 .value_parser([
                     PossibleValue::new("allow"),
@@ -130,20 +132,20 @@ RUST_LOG=info
                 .help("Client will be in window mode instead of fullscreen")
                 .short('w')
                 .long("window-mode")
-                .takes_value(false),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("decoder")
                 .short('d')
                 .long("decoder")
-                .takes_value(true)
+                .num_args(1)
                 .help("Force decoder name (libx264, h264_qsv, ...) (must be compatible with selected encoder)"),
         )
         .arg(
             Arg::new("allow-print")
                 .short('j')
                 .long("allow-print")
-                .takes_value(true)
+                .num_args(1)
                 .help(
                     r#""Allow print order from serveur to local printing service.
 The argument is the local firectory base which contains files to print
@@ -154,7 +156,7 @@ Ex: -j c:\user\dupond\printdir\
             Arg::new("proxycommand")
                 .short('p')
                 .long("proxycommand")
-                .takes_value(true)
+                .num_args(1)
                 .help("Command to execute to establish connection"),
         );
 
@@ -164,42 +166,34 @@ Ex: -j c:\user\dupond\printdir\
             .help("Enable kerberos using server cname")
             .short('k')
             .long("server_cname")
-            .takes_value(true),
+            .num_args(1),
     );
 
     let matches = app.get_matches();
 
-    let server_ip = matches.value_of("ip").expect("IP server is mandatory");
+    let server_ip = matches
+        .get_one::<String>("ip")
+        .expect("IP server is mandatory");
 
-    let server_port: u16 = matches
-        .value_of("port")
-        .unwrap_or("1122")
-        .parse::<u16>()
-        .expect("Cannot parse port");
+    let server_port = *matches.get_one::<u16>("port").unwrap_or(&1122);
 
-    let audio_buffer_ms: u32 = matches
-        .value_of("audio_buffer_ms")
-        .unwrap_or("150")
-        .parse::<u32>()
-        .expect("Cannot parse audio_buffer_ms");
+    let audio_buffer_ms = *matches.get_one::<u32>("audio_buffer_ms").unwrap_or(&150);
 
-    let audio_sample_rate = matches
-        .value_of("audio_sample_rate")
-        .map(|audio_sample_rate| {
-            audio_sample_rate
-                .parse::<u32>()
-                .expect("Cannot parse audio_sample_rate")
-        });
+    let audio_sample_rate = matches.get_one::<u32>("audio_sample_rate").cloned();
 
-    let audio = matches.is_present("audio");
-    let server_cname = matches.value_of("server_cname");
-    let tls_ca = matches.value_of("tls_ca");
-    let client_cert = matches.value_of("client_cert");
-    let client_key = matches.value_of("client_key");
-    let tls_server_name = matches.value_of("tls_server_name");
-    let login = matches.is_present("login");
+    let audio = matches.get_flag("audio");
+    let server_cname = matches.get_one::<String>("server_cname").cloned();
+    let tls_ca = matches.get_one::<String>("tls_ca").cloned();
+    let client_cert = matches.get_one::<String>("client_cert").cloned();
+    let client_key = matches.get_one::<String>("client_key").cloned();
+    let tls_server_name = matches.get_one::<String>("tls_server_name").cloned();
+    let login = matches.get_flag("login");
 
-    let clipboard_config = match matches.value_of("clipboard").unwrap_or("allow") {
+    let clipboard_config = match matches
+        .get_one::<String>("clipboard")
+        .unwrap_or(&"allow".to_string())
+        .as_str()
+    {
         "allow" => ClipboardConfig::Allow,
         "deny" => ClipboardConfig::Deny,
         "trig" => ClipboardConfig::Trig,
@@ -208,10 +202,10 @@ Ex: -j c:\user\dupond\printdir\
         }
     };
 
-    let window_mode = matches.is_present("window-mode");
-    let decoder_name = matches.value_of("decoder");
-    let printdir = matches.value_of("allow-print");
-    let client_config = match matches.value_of("config") {
+    let window_mode = matches.get_flag("window-mode");
+    let decoder_name = matches.get_one::<String>("decoder").cloned();
+    let printdir = matches.get_one::<String>("allow-print").cloned();
+    let client_config = match matches.get_one::<String>("config") {
         Some(config_path) => {
             read_client_config(config_path).expect("Cannot read configuration file")
         }
@@ -219,7 +213,7 @@ Ex: -j c:\user\dupond\printdir\
             ffmpeg: HashMap::new(),
         },
     };
-    let proxycommand = matches.value_of("proxycommand");
+    let proxycommand = matches.get_one::<String>("proxycommand").cloned();
 
     let arguments = ArgumentsClient {
         address: server_ip,

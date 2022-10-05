@@ -21,7 +21,7 @@ Protocol version: {:?}
 
     let matches = Command::new("Sanzu proxy")
         .version("0.1.0")
-        .about(about.as_str())
+        .about(about)
         .arg(
             Arg::new("server_ip")
                 .help("Sets the server IP (Ex: 127.0.0.1)")
@@ -40,42 +40,44 @@ Protocol version: {:?}
                 .long("config")
                 .help("configuration file")
                 .default_value(DEFAULT_CONFIG)
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("vsock")
                 .short('v')
                 .long("vsock")
-                .takes_value(false)
+                .num_args(0)
                 .help("Use vsock"),
         )
         .arg(
             Arg::new("listen")
                 .short('l')
                 .long("listen")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("127.0.0.1")
+                .value_parser(clap::value_parser!(IpAddr))
                 .help("Listen address"),
         )
         .arg(
             Arg::new("listen_port")
                 .short('p')
                 .long("port")
-                .takes_value(true)
+                .num_args(1)
+                .value_parser(clap::value_parser!(u16))
                 .help("Bind port number"),
         )
         .arg(
             Arg::new("connect_unix_socket")
                 .short('u')
                 .long("unix_socket")
-                .takes_value(true)
+                .num_args(1)
                 .help("Path of the unix socket to connect to instead of listening for the client"),
         )
         .arg(
             Arg::new("encoder")
                 .short('e')
                 .long("encoder")
-                .takes_value(true)
+                .num_args(1)
                 .help("Encoder name (libx264, h264_nvenc, ...)"),
         )
         .arg(
@@ -83,13 +85,13 @@ Protocol version: {:?}
                 .help("Allow audio forwarding")
                 .short('a')
                 .long("audio")
-                .takes_value(false),
+                .num_args(0),
         )
         .arg(
             Arg::new("import_video_shm")
                 .short('i')
                 .long("import_video_shm")
-                .takes_value(true)
+                .num_args(1)
                 .help(
                     "Input video from shared memory\n\
                      Example: if the video server runs in a vm,\n\
@@ -102,34 +104,31 @@ Protocol version: {:?}
                 .help("Input from shared memory is in xwd format")
                 .short('x')
                 .long("shm_is_xwd")
-                .takes_value(false),
+                .num_args(0),
         )
         .get_matches();
 
     let server_addr = matches
-        .value_of("server_ip")
+        .get_one::<String>("server_ip")
         .expect("Cannot parse server ip address");
 
-    let listen_address = matches
-        .value_of("listen")
-        .unwrap()
-        .parse::<IpAddr>()
-        .expect("Cannot parse listen address");
+    let listen_address = *matches.get_one::<IpAddr>("listen").unwrap();
 
-    let server_port = matches.value_of("server_port").unwrap();
+    let server_port = matches.get_one::<String>("server_port").unwrap();
 
-    let listen_port = matches
-        .value_of("listen_port")
-        .map(|x| x.parse::<u16>().expect("Cannot parse port"));
+    let listen_port = matches.get_one::<u16>("listen_port").cloned();
 
-    let unix_socket = matches.value_of("connect_unix_socket");
+    let unix_socket = matches.get_one::<String>("connect_unix_socket").cloned();
 
-    let audio = matches.is_present("audio");
-    let encoder_name = matches.value_of("encoder").unwrap_or("libx264");
-    let conf = read_server_config(matches.value_of("config").unwrap()).unwrap();
-    let vsock = matches.is_present("vsock");
-    let import_video_shm = matches.value_of("import_video_shm");
-    let shm_is_xwd = matches.is_present("shm_is_xwd");
+    let audio = matches.get_flag("audio");
+    let encoder_name = matches
+        .get_one::<String>("encoder")
+        .unwrap_or(&"libx264".to_string())
+        .to_owned();
+    let conf = read_server_config(matches.get_one::<String>("config").unwrap()).unwrap();
+    let vsock = matches.get_flag("vsock");
+    let import_video_shm = matches.get_one::<String>("import_video_shm").cloned();
+    let shm_is_xwd = matches.get_flag("shm_is_xwd");
 
     let arguments = ArgumentsProxy {
         vsock,

@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 #[macro_use]
 extern crate log;
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 
 use sanzu::{config::read_server_config, server, utils::ArgumentsSrv};
 
@@ -26,41 +26,41 @@ Protocol version: {:?}
 
     let matches = Command::new("Sanzu server")
         .version("0.1.0")
-        .about(about.as_str())
+        .about(about)
         .arg(
             Arg::new("config")
                 .short('f')
                 .long("config")
                 .help("configuration file")
                 .default_value(DEFAULT_CONFIG)
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("vsock")
                 .short('v')
                 .long("vsock")
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help("Use vsock"),
         )
         .arg(
             Arg::new("unixsock")
                 .short('u')
                 .long("unixsock")
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help("Use unixsocket"),
         )
         .arg(
             Arg::new("connect-unixsock")
                 .short('c')
                 .long("connect-unixsock")
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help("connect to unixsocket instead of listening"),
         )
         .arg(
             Arg::new("listen")
                 .short('l')
                 .long("listen")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("127.0.0.1")
                 .help("Listen address"),
         )
@@ -68,14 +68,14 @@ Protocol version: {:?}
             Arg::new("stdio")
                 .short('m')
                 .long("stdio")
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help("Uses STDIO instead of listining on a TCP port"),
         )
         .arg(
             Arg::new("port")
                 .short('p')
                 .long("port")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("1122")
                 .help("Bind port number"),
         )
@@ -83,7 +83,7 @@ Protocol version: {:?}
             Arg::new("encoder")
                 .short('e')
                 .long("encoder")
-                .takes_value(true)
+                .num_args(1)
                 .help("Encoder name (libx264, h264_nvenc, ...)"),
         )
         .arg(
@@ -91,34 +91,34 @@ Protocol version: {:?}
                 .help("Seamless mode")
                 .short('s')
                 .long("seamless")
-                .takes_value(false),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("keep_server_resolution")
                 .help("Server will keep it's resolution")
                 .short('x')
                 .long("keep_server_resolution")
-                .takes_value(false),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("audio")
                 .help("Allow audio forwarding")
                 .short('a')
                 .long("audio")
-                .takes_value(false),
+                .action(ArgAction::SetTrue),
         )
         .arg(
             Arg::new("raw_sound")
                 .short('r')
                 .long("raw_sound")
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help("Transmit Raw sound"),
         )
         .arg(
             Arg::new("export_video_pci")
                 .short('i')
                 .long("export_video_pci")
-                .takes_value(false)
+                .action(ArgAction::SetTrue)
                 .help(
                     "Export video to a pci shared memory\n\
                      Example: if the video server runs in a vm,\n\
@@ -130,7 +130,7 @@ Protocol version: {:?}
             Arg::new("use_extern_img_source")
                 .short('k')
                 .long("use_extern_img_source")
-                .takes_value(true)
+                .num_args(1)
                 .help(
                     "Do not extract image from x11\n\
                      Example: if you use Xvfb you can use Xvfb backbuffer file\n\
@@ -141,6 +141,7 @@ Protocol version: {:?}
             Arg::new("avoid_img_extraction")
                 .short('j')
                 .long("avoid_img_extraction")
+                .action(ArgAction::SetTrue)
                 .help(
                     "The video server considers that image extraction will be done by\n\
                      another process. Empty images will we sent to client.\n\
@@ -152,29 +153,33 @@ Protocol version: {:?}
                 .help("Don't send clipboard to client")
                 .short('q')
                 .long("restrict-clipboard")
-                .takes_value(false),
+                .action(ArgAction::SetTrue),
         )
         .get_matches();
 
-    let address = matches.value_of("listen").unwrap();
+    let address = matches.get_one::<String>("listen").unwrap();
 
-    let port = matches.value_of("port").unwrap();
+    let port = matches.get_one::<String>("port").unwrap();
 
-    let seamless = matches.is_present("seamless");
-    let keep_server_resolution = matches.is_present("keep_server_resolution");
-    let audio = matches.is_present("audio");
-    let encoder_name = matches.value_of("encoder").unwrap_or("libx264");
-    let raw_sound = matches.is_present("raw_sound");
-    let conf = read_server_config(matches.value_of("config").unwrap())
+    let seamless = matches.get_flag("seamless");
+    let keep_server_resolution = matches.get_flag("keep_server_resolution");
+    let audio = matches.get_flag("audio");
+    let encoder_name = matches
+        .get_one::<String>("encoder")
+        .unwrap_or(&"libx264".to_string())
+        .to_owned();
+
+    let raw_sound = matches.get_flag("raw_sound");
+    let conf = read_server_config(matches.get_one::<String>("config").unwrap())
         .context("Cannot read configuration file")?;
-    let vsock = matches.is_present("vsock");
-    let stdio = matches.is_present("stdio");
-    let unixsock = matches.is_present("unixsock");
-    let connect_unixsock = matches.is_present("connect-unixsock");
-    let export_video_pci = matches.is_present("export_video_pci");
-    let restrict_clipboard = matches.is_present("restrict-clipboard");
-    let extern_img_source = matches.value_of("use_extern_img_source");
-    let avoid_img_extraction = matches.is_present("avoid_img_extraction");
+    let vsock = matches.get_flag("vsock");
+    let stdio = matches.get_flag("stdio");
+    let unixsock = matches.get_flag("unixsock");
+    let connect_unixsock = matches.get_flag("connect-unixsock");
+    let export_video_pci = matches.get_flag("export_video_pci");
+    let restrict_clipboard = matches.get_flag("restrict-clipboard");
+    let extern_img_source = matches.get_one::<String>("use_extern_img_source").cloned();
+    let avoid_img_extraction = matches.get_flag("avoid_img_extraction");
 
     let arguments = ArgumentsSrv {
         vsock,

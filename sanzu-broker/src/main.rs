@@ -366,47 +366,49 @@ Protocol version: {:?}
 
     let matches = Command::new("Surf server")
         .version("0.1.0")
-        .about(about.as_str())
+        .about(about)
         .arg(
             Arg::new("config")
                 .short('f')
                 .long("config")
                 .help("configuration file")
                 .default_value(DEFAULT_CONFIG)
-                .takes_value(true),
+                .num_args(1),
         )
         .arg(
             Arg::new("listen")
                 .short('l')
                 .long("listen")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("127.0.0.1")
+                .value_parser(clap::value_parser!(IpAddr))
                 .help("Listen address"),
         )
         .arg(
             Arg::new("port")
                 .short('p')
                 .long("port")
-                .takes_value(true)
+                .num_args(1)
                 .default_value("1122")
+                .value_parser(clap::value_parser!(u16))
                 .help("Bind port number"),
         )
         .get_matches();
 
-    let address = matches
-        .value_of("listen")
-        .unwrap()
-        .parse::<IpAddr>()
+    let address = *matches
+        .get_one::<IpAddr>("listen")
         .context("Cannot parse listen address")?;
 
-    let port = matches
-        .value_of("port")
-        .unwrap()
-        .parse::<u16>()
+    let port = *matches
+        .get_one::<u16>("port")
         .context("Cannot parse port")?;
 
-    let config = read_config(matches.value_of("config").context("Error in config path")?)
-        .context("Error in read_config")?;
+    let config = read_config(
+        matches
+            .get_one::<String>("config")
+            .context("Error in config path")?,
+    )
+    .context("Error in read_config")?;
 
     if let Err(err) = serve_user(&config, address, port) {
         error!("Server error");

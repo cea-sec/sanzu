@@ -1011,7 +1011,7 @@ pub fn init_wind3d(
         ClientWindows::build(
             server_size,
             argumets.clipboard_config,
-            argumets.printdir.map(|printdir| printdir.to_string()),
+            argumets.printdir.clone(),
         );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
     let window_mode = argumets.window_mode;

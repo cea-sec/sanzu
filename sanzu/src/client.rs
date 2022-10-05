@@ -223,15 +223,19 @@ pub fn do_run(
     };
     debug!("Connected");
 
-    let tls_server_name_ok = arguments.tls_server_name.unwrap_or("no_server_name");
+    let tls_server_name_ok = arguments
+        .tls_server_name
+        .clone()
+        .unwrap_or_else(|| "no_server_name".to_string());
     let server_name = tls_server_name_ok
+        .as_str()
         .try_into()
         .map_err(|err| anyhow!("Err {:?}", err))
         .context("Error in dns server tls name")?;
     let config = make_client_config(
-        arguments.tls_ca,
-        arguments.client_cert,
-        arguments.client_key,
+        arguments.tls_ca.as_deref(),
+        arguments.client_cert.as_deref(),
+        arguments.client_key.as_deref(),
     )
     .context("Error in make client tls config")?;
     let mut conn = rustls::ClientConnection::new(config, server_name)
@@ -264,7 +268,7 @@ pub fn do_run(
     }
 
     #[cfg(feature = "kerberos")]
-    if let Some(cname) = arguments.server_cname {
+    if let Some(cname) = &arguments.server_cname {
         do_kerberos_server_auth(cname, server)
             .context("Error in perform_auth")
             .map_err(|err| send_client_err_event(server, err))?
@@ -319,7 +323,7 @@ pub fn do_run(
     let msg = recv_server_msg_type!(server, Hello).context("Error in recv ServerHello")?;
 
     info!("{:?}", msg);
-    let codec_name = match arguments.decoder_name {
+    let codec_name = match &arguments.decoder_name {
         Some(decoder_name) => decoder_name.to_owned(),
         None => msg.codec_name.to_owned(),
     };
