@@ -249,78 +249,79 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
     let codec_name = get_encoder_category(&arguments.encoder_name)?;
 
     /* Send server hello with image info & codec name */
-    let (mut server_info, audio_sample_rate) = if arguments.keep_server_resolution {
-        #[cfg(unix)]
-        let server_info = init_x11rb(arguments, config, None).context("Cannot init_x11rb")?;
-        #[cfg(windows)]
-        let server_info = init_win(arguments, config, None)?;
+    let (mut server_info, audio_sample_rate) =
+        if arguments.keep_server_resolution || arguments.rdonly {
+            #[cfg(unix)]
+            let server_info = init_x11rb(arguments, config, None).context("Cannot init_x11rb")?;
+            #[cfg(windows)]
+            let server_info = init_win(arguments, config, None)?;
 
-        let (screen_width, screen_height) = server_info.size();
-        let server_mode = tunnel::server_hello::Msg::Fullscreen(tunnel::ServerFullScreen {
-            width: screen_width as u32,
-            height: screen_height as u32,
-        });
+            let (screen_width, screen_height) = server_info.size();
+            let server_mode = tunnel::server_hello::Msg::Fullscreen(tunnel::ServerFullScreen {
+                width: screen_width as u32,
+                height: screen_height as u32,
+            });
 
-        let server_hello = tunnel::ServerHello {
-            codec_name,
-            audio: arguments.audio,
-            msg: Some(server_mode),
+            let server_hello = tunnel::ServerHello {
+                codec_name,
+                audio: arguments.audio,
+                msg: Some(server_mode),
+            };
+
+            send_server_msg_type!(&mut sock, server_hello, Hello).context("Cannot send hello")?;
+
+            /* recv client hello with audio bool */
+            let msg: tunnel::ClientHelloFullscreen =
+                recv_client_msg_type!(&mut sock, Clienthellofullscreen)
+                    .context("Error in send client hello full screen")?;
+
+            let audio_sample_rate = match msg.audio {
+                true => Some(msg.audio_sample_rate),
+                false => None,
+            };
+            (server_info, audio_sample_rate)
+        } else {
+            let server_mode = tunnel::server_hello::Msg::AdaptScreen(tunnel::ServerAdaptScreen {
+                seamless: arguments.seamless,
+            });
+
+            let server_hello = tunnel::ServerHello {
+                codec_name,
+                audio: arguments.audio,
+                msg: Some(server_mode),
+            };
+
+            send_server_msg_type!(&mut sock, server_hello, Hello).context("Cannot send hello")?;
+
+            /* recv client hello with audio bool */
+            let msg: tunnel::ClientHelloResolution =
+                recv_client_msg_type!(&mut sock, Clienthelloresolution)
+                    .context("Error in recv client hello resolution")?;
+
+            info!("Client screen size {:?}x{:?}", msg.width, msg.height);
+            let client_screen_size = Some((msg.width as u16, msg.height as u16));
+            #[cfg(unix)]
+            let mut server_info =
+                init_x11rb(arguments, config, client_screen_size).context("Cannot init_x11rb")?;
+            #[cfg(windows)]
+            let mut server_info = init_win(arguments, config, client_screen_size)?;
+
+            // Force server resolution
+            let (width, height) = server_info.size();
+            let (width, height) = (width & !1, height & !1);
+            if server_info
+                .change_resolution(config, width as u32, height as u32)
+                .is_err()
+            {
+                warn!("Cannot change server resolution");
+            }
+
+            let audio_sample_rate = match msg.audio {
+                true => Some(msg.audio_sample_rate),
+                false => None,
+            };
+            (server_info, audio_sample_rate)
         };
-
-        send_server_msg_type!(&mut sock, server_hello, Hello).context("Cannot send hello")?;
-
-        /* recv client hello with audio bool */
-        let msg: tunnel::ClientHelloFullscreen =
-            recv_client_msg_type!(&mut sock, Clienthellofullscreen)
-                .context("Error in send client hello full screen")?;
-
-        let audio_sample_rate = match msg.audio {
-            true => Some(msg.audio_sample_rate),
-            false => None,
-        };
-        (server_info, audio_sample_rate)
-    } else {
-        let server_mode = tunnel::server_hello::Msg::AdaptScreen(tunnel::ServerAdaptScreen {
-            seamless: arguments.seamless,
-        });
-
-        let server_hello = tunnel::ServerHello {
-            codec_name,
-            audio: arguments.audio,
-            msg: Some(server_mode),
-        };
-
-        send_server_msg_type!(&mut sock, server_hello, Hello).context("Cannot send hello")?;
-
-        /* recv client hello with audio bool */
-        let msg: tunnel::ClientHelloResolution =
-            recv_client_msg_type!(&mut sock, Clienthelloresolution)
-                .context("Error in recv client hello resolution")?;
-
-        info!("Client screen size {:?}x{:?}", msg.width, msg.height);
-        let client_screen_size = Some((msg.width as u16, msg.height as u16));
-        #[cfg(unix)]
-        let mut server_info =
-            init_x11rb(arguments, config, client_screen_size).context("Cannot init_x11rb")?;
-        #[cfg(windows)]
-        let mut server_info = init_win(arguments, config, client_screen_size)?;
-
-        // Force server resolution
-        let (width, height) = server_info.size();
-        let (width, height) = (width & !1, height & !1);
-        if server_info
-            .change_resolution(config, width as u32, height as u32)
-            .is_err()
-        {
-            warn!("Cannot change server resolution");
-        }
-
-        let audio_sample_rate = match msg.audio {
-            true => Some(msg.audio_sample_rate),
-            false => None,
-        };
-        (server_info, audio_sample_rate)
-    };
 
     let mut video_encoder: Box<dyn Encoder> = init_video_encoder(
         arguments.encoder_name.as_str(),
@@ -489,17 +490,19 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
         let msgs =
             recv_client_msg_type!(&mut sock, Msgsclient).context("Cannot recv client msgs")?;
 
-        let server_events = server_info
-            .handle_client_event(msgs)
-            .context("Error in client handle events")?;
+        if !arguments.rdonly {
+            let server_events = server_info
+                .handle_client_event(msgs)
+                .context("Error in client handle events")?;
 
-        for server_event in server_events {
-            match server_event {
-                ServerEvent::ResolutionChange(width, height) => {
-                    let width = width & !1;
-                    let height = height & !1;
-                    // Keep change resolution event for next cycle
-                    new_size = Some((width, height));
+            for server_event in server_events {
+                match server_event {
+                    ServerEvent::ResolutionChange(width, height) => {
+                        let width = width & !1;
+                        let height = height & !1;
+                        // Keep change resolution event for next cycle
+                        new_size = Some((width, height));
+                    }
                 }
             }
         }

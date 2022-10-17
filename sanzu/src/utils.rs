@@ -35,6 +35,7 @@ pub struct ArgumentsSrv<'a> {
     pub restrict_clipboard: bool,
     pub extern_img_source: Option<String>,
     pub avoid_img_extraction: bool,
+    pub rdonly: bool,
 }
 
 pub struct ArgumentsClient<'a> {

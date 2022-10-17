@@ -155,6 +155,13 @@ Protocol version: {:?}
                 .long("restrict-clipboard")
                 .action(ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("rdonly")
+                .help("Read only server")
+                .short('o')
+                .long("rdonly")
+                .action(ArgAction::SetTrue),
+        )
         .get_matches();
 
     let address = matches.get_one::<String>("listen").unwrap();
@@ -180,6 +187,7 @@ Protocol version: {:?}
     let restrict_clipboard = matches.get_flag("restrict-clipboard");
     let extern_img_source = matches.get_one::<String>("use_extern_img_source").cloned();
     let avoid_img_extraction = matches.get_flag("avoid_img_extraction");
+    let rdonly = matches.get_flag("rdonly");
 
     let arguments = ArgumentsSrv {
         vsock,
@@ -197,6 +205,7 @@ Protocol version: {:?}
         restrict_clipboard,
         extern_img_source,
         avoid_img_extraction,
+        rdonly,
     };
 
     if let Err(err) = server::run(&conf, &arguments) {
