@@ -93,6 +93,7 @@ RUST_LOG=info
                 .help("Audio buffer ms (default: 150ms)")
                 .short('b')
                 .long("audio_buffer_ms")
+                .value_parser(clap::value_parser!(u32))
                 .num_args(1),
         )
         .arg(
