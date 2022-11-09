@@ -6,6 +6,7 @@ use crate::{
 use anyhow::{Context, Result};
 
 use clipboard_win::{formats, get_clipboard, set_clipboard};
+use lock_keys::LockKeyWrapper;
 use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
@@ -92,6 +93,7 @@ lazy_static! {
     static ref WINDOW_SENDER: Mutex<Option<Sender<AreaManager>>> = Mutex::new(None);
     static ref MSG_SENDER: Mutex<Option<Sender<u64>>> = Mutex::new(None);
     static ref SKIP_CLIPBOARD: Mutex<u32> = Mutex::new(0);
+    static ref SYNC_KEY_LOCKS_NEEDED: Mutex<bool> = Mutex::new(false);
 }
 
 /// Windows keycodes come from raw usb hid keycodes,
@@ -112,6 +114,13 @@ const MIN_CURSOR_SIZE: u32 = 32;
 enum AreaManager {
     CreateArea(usize),
     DeleteArea(usize),
+}
+
+fn key_state_to_bool(state: lock_keys::LockKeyState) -> bool {
+    match state {
+        lock_keys::LockKeyState::Enabled => true,
+        lock_keys::LockKeyState::Disabled => false,
+    }
 }
 
 pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
@@ -226,6 +235,8 @@ pub struct ClientWindows {
     pub clipboard_config: ClipboardConfig,
     pub clipboard_last_value: Option<String>,
     pub printdir: Option<String>,
+    /// Sync caps/num/scroll lock
+    pub sync_key_locks: bool,
 }
 
 impl ClientWindows {
@@ -233,6 +244,7 @@ impl ClientWindows {
         server_size: Option<(u16, u16)>,
         clipboard_config: ClipboardConfig,
         printdir: Option<String>,
+        sync_key_locks: bool,
     ) -> (
         ClientWindows,
         FrameReceiver,
@@ -258,6 +270,8 @@ impl ClientWindows {
             }
         };
 
+        *SYNC_KEY_LOCKS_NEEDED.lock().unwrap() = true;
+
         let video_client = ClientWindows {
             frame_sender,
             cursor_sender,
@@ -269,6 +283,7 @@ impl ClientWindows {
             clipboard_config,
             clipboard_last_value: None,
             printdir,
+            sync_key_locks,
         };
 
         (
@@ -526,6 +541,9 @@ extern "system" fn custom_wnd_proc(
     match msg {
         WM_SETFOCUS => {
             trace!("got focus");
+            // If caps/num/scroll locks have changed during out of focus,
+            // force keys state synchro
+            *SYNC_KEY_LOCKS_NEEDED.lock().unwrap() = true;
         }
         WM_KILLFOCUS => {
             trace!("lost focus");
@@ -1012,6 +1030,7 @@ pub fn init_wind3d(
             server_size,
             argumets.clipboard_config,
             argumets.printdir.clone(),
+            argumets.sync_key_locks,
         );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
     let window_mode = argumets.window_mode;
@@ -1428,6 +1447,33 @@ impl Client for ClientWindows {
     fn poll_events(&mut self) -> Result<tunnel::MessagesClient> {
         let mut events = vec![];
         let mut last_move = None;
+
+        if self.sync_key_locks && *SYNC_KEY_LOCKS_NEEDED.lock().unwrap() {
+            let lockkey = lock_keys::LockKey::new();
+            let caps_lock = lockkey
+                .state(lock_keys::LockKeys::CapitalLock)
+                .expect("Cannot get key state");
+            let num_lock = lockkey
+                .state(lock_keys::LockKeys::NumberLock)
+                .expect("Cannot get key state");
+            let scroll_lock = lockkey
+                .state(lock_keys::LockKeys::ScrollingLock)
+                .expect("Cannot get key state");
+
+            let eventkeysync = tunnel::EventKeyLocks {
+                caps_lock: key_state_to_bool(caps_lock),
+                num_lock: key_state_to_bool(num_lock),
+                scroll_lock: key_state_to_bool(scroll_lock),
+            };
+
+            let msg_event = tunnel::MessageClient {
+                msg: Some(tunnel::message_client::Msg::Keylocks(eventkeysync)),
+            };
+            events.push(msg_event);
+
+            *SYNC_KEY_LOCKS_NEEDED.lock().unwrap() = false;
+        }
+
         while let Ok(event) = self.event_receiver.try_recv() {
             match event {
                 event @ tunnel::MessageClient {

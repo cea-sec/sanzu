@@ -24,6 +24,7 @@ ffmpeg-sys-next = "5.0.1"
 hound = "3.4"
 lazy_static = "1.4.0"
 libc = "0.2"
+lock_keys = {git="https://github.com/risoflora/lock_keys", rev="9b038ae641264a196845fcf9378ee4c2fa3aa8f0"}
 log = "0.4.13"
 memmap2 = "0.5.4"
 opus="0.3.0"

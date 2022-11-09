@@ -154,6 +154,13 @@ Ex: -j c:\user\dupond\printdir\
 "#)
         )
         .arg(
+            Arg::new("sync_key_locks")
+                .help("Synchronize caps/num/scroll lock")
+                .short('g')
+                .long("sync_key_locks")
+                .action(ArgAction::SetTrue),
+        )
+        .arg(
             Arg::new("proxycommand")
                 .short('p')
                 .long("proxycommand")
@@ -215,6 +222,7 @@ Ex: -j c:\user\dupond\printdir\
         },
     };
     let proxycommand = matches.get_one::<String>("proxycommand").cloned();
+    let sync_key_locks = matches.get_flag("sync_key_locks");
 
     let arguments = ArgumentsClient {
         address: server_ip,
@@ -233,6 +241,7 @@ Ex: -j c:\user\dupond\printdir\
         decoder_name,
         printdir,
         proxycommand,
+        sync_key_locks,
     };
 
     if let Err(err) = client::run(

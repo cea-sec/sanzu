@@ -18,6 +18,11 @@ message EventClipboard {
   string data = 1;
 };
 
+message EventKeyLocks {
+  bool caps_lock = 1;
+  bool num_lock = 2;
+  bool scroll_lock = 3;
+};
 
 message EventKerberos {
   bytes data = 1;
@@ -216,6 +221,7 @@ message MessageClient {
     EventClipboard clipboard = 4;
     EventDisplay display = 5;
     EventWinActivate activate = 6;
+    EventKeyLocks keylocks = 7;
   }
 };
 
