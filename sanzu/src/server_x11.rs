@@ -849,14 +849,11 @@ pub fn init_x11rb(
 
     del_custom_video_mode(&conn, window_info).context("Error in del_custom_video_mode")?;
     // If we are already stucked in custom mode, update index accordingly
-    let video_mode_index = if utils_x11::get_video_mode(&conn, window_info, VIDEO_NAME_2)
-        .context("Error in get_video_mode")?
-        .is_some()
-    {
-        1
-    } else {
-        0
-    };
+    let video_mode_index = usize::from(
+        utils_x11::get_video_mode(&conn, window_info, VIDEO_NAME_2)
+            .context("Error in get_video_mode")?
+            .is_some(),
+    );
 
     let (selection_sender_primary, clipboard_event_receiver) = channel();
     let selection_sender_clipboard = selection_sender_primary.clone();
