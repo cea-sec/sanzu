@@ -137,9 +137,9 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
             #[cfg(unix)]
             {
                 let socket = if arguments.connect_unixsock {
-                    std::os::unix::net::UnixStream::connect(&arguments.address)?
+                    std::os::unix::net::UnixStream::connect(arguments.address)?
                 } else {
-                    let listener = std::os::unix::net::UnixListener::bind(&arguments.address)?;
+                    let listener = std::os::unix::net::UnixListener::bind(arguments.address)?;
                     let (socket, addr) =
                         listener.accept().context("Error in UnixListener accept")?;
                     info!("Client {:?}", addr);

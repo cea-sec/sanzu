@@ -55,6 +55,7 @@ pub struct ArgumentsClient<'a> {
     pub decoder_name: Option<String>,
     pub printdir: Option<String>,
     pub proxycommand: Option<String>,
+    pub sync_key_locks: bool,
 }
 
 pub struct ArgumentsProxy<'a> {

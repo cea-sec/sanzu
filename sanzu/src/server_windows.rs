@@ -8,7 +8,7 @@ use crate::{
 use anyhow::{Context, Result};
 
 use clipboard_win::{formats, get_clipboard, set_clipboard};
-
+use lock_keys::LockKeyWrapper;
 use sanzu_common::tunnel;
 
 use std::{
@@ -150,6 +150,13 @@ lazy_static! {
     static ref SURFACE_MAP_ADDR: atomic::AtomicPtr<u8> = atomic::AtomicPtr::new(null_mut());
     static ref SURFACE_MAP_PITCH: atomic::AtomicI32 = atomic::AtomicI32::new(0);
     static ref AREAS: Mutex<HashMap<usize, Area>> = Mutex::new(HashMap::new());
+}
+
+fn bool_to_key_state(state: bool) -> lock_keys::LockKeyState {
+    match state {
+        true => lock_keys::LockKeyState::Enabled,
+        false => lock_keys::LockKeyState::Disabled,
+    }
 }
 
 extern "system" fn custom_wnd_proc(
@@ -942,6 +949,25 @@ impl Server for ServerInfo {
                     set_clipboard(formats::Unicode, event.data.clone())
                         .map_err(|err| anyhow!("Err {:?}", err))
                         .context("Cannot set clipboard")?;
+                }
+
+                Some(tunnel::message_client::Msg::Keylocks(event)) => {
+                    info!("keyboard state {:?}", event);
+                    let caps_lock = bool_to_key_state(event.caps_lock);
+                    let num_lock = bool_to_key_state(event.num_lock);
+                    let scroll_lock = bool_to_key_state(event.scroll_lock);
+
+                    let lockkey = lock_keys::LockKey::new();
+
+                    lockkey
+                        .set(lock_keys::LockKeys::CapitalLock, caps_lock)
+                        .unwrap();
+                    lockkey
+                        .set(lock_keys::LockKeys::NumberLock, num_lock)
+                        .unwrap();
+                    lockkey
+                        .set(lock_keys::LockKeys::ScrollingLock, scroll_lock)
+                        .unwrap();
                 }
 
                 _ => {}

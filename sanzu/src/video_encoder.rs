@@ -74,7 +74,7 @@ impl EncoderBuilder {
     fn open(mut self) -> Result<EncoderFFmpeg> {
         if let Some(ref command) = &self.command {
             info!("Spawn custom command retreive");
-            let child = process::Command::new(&command)
+            let child = process::Command::new(command)
                 .output()
                 .context("Cannot run ffmpeg options command")?;
             let output = std::str::from_utf8(&child.stdout)

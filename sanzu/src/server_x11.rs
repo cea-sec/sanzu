@@ -12,8 +12,8 @@ use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 use dbus::channel::MatchingReceiver;
 
 use libc::{self, shmat, shmctl, shmdt, shmget};
+use lock_keys::LockKeyWrapper;
 use memmap2::{Mmap, MmapMut};
-
 use sanzu_common::tunnel;
 
 use std::{
@@ -849,14 +849,11 @@ pub fn init_x11rb(
 
     del_custom_video_mode(&conn, window_info).context("Error in del_custom_video_mode")?;
     // If we are already stucked in custom mode, update index accordingly
-    let video_mode_index = if utils_x11::get_video_mode(&conn, window_info, VIDEO_NAME_2)
-        .context("Error in get_video_mode")?
-        .is_some()
-    {
-        1
-    } else {
-        0
-    };
+    let video_mode_index = usize::from(
+        utils_x11::get_video_mode(&conn, window_info, VIDEO_NAME_2)
+            .context("Error in get_video_mode")?
+            .is_some(),
+    );
 
     let (selection_sender_primary, clipboard_event_receiver) = channel();
     let selection_sender_clipboard = selection_sender_primary.clone();
@@ -1074,6 +1071,13 @@ pub fn set_clipboard(server: &mut ServerX11, data: &str) -> Result<()> {
     Ok(())
 }
 
+fn bool_to_key_state(state: bool) -> lock_keys::LockKeyState {
+    match state {
+        true => lock_keys::LockKeyState::Enabled,
+        false => lock_keys::LockKeyState::Disabled,
+    }
+}
+
 impl Server for ServerX11 {
     fn size(&self) -> (u16, u16) {
         (self.width, self.height)
@@ -1183,6 +1187,25 @@ impl Server for ServerX11 {
                     if self.activate_window(event.id).is_err() {
                         error!("Cannot activate window");
                     }
+                }
+
+                Some(tunnel::message_client::Msg::Keylocks(event)) => {
+                    info!("keyboard state {:?}", event);
+                    let caps_lock = bool_to_key_state(event.caps_lock);
+                    let num_lock = bool_to_key_state(event.num_lock);
+                    let scroll_lock = bool_to_key_state(event.scroll_lock);
+
+                    let lockkey = lock_keys::LockKey::new();
+
+                    lockkey
+                        .set(lock_keys::LockKeys::CapitalLock, caps_lock)
+                        .unwrap();
+                    lockkey
+                        .set(lock_keys::LockKeys::NumberLock, num_lock)
+                        .unwrap();
+                    lockkey
+                        .set(lock_keys::LockKeys::ScrollingLock, scroll_lock)
+                        .unwrap();
                 }
                 _ => {}
             };

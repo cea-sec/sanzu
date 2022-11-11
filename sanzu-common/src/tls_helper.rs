@@ -150,7 +150,7 @@ pub fn make_client_config(
     if ca_file.is_some() {
         let cafile = ca_file.as_ref().unwrap();
 
-        let certfile = fs::File::open(&cafile).context("Cannot open CA file")?;
+        let certfile = fs::File::open(cafile).context("Cannot open CA file")?;
         let mut reader = BufReader::new(certfile);
         root_store.add_parsable_certificates(&rustls_pemfile::certs(&mut reader).unwrap());
     } else {

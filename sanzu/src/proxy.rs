@@ -148,7 +148,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
 
     let video_shared_mem = match arguments.video_shared_mem.as_deref() {
         Some(shared_mem_file) => {
-            let file = fs::File::open(&shared_mem_file)
+            let file = fs::File::open(shared_mem_file)
                 .context(format!("Error in open shared mem {:?}", shared_mem_file))?;
             unsafe {
                 Some(

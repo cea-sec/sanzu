@@ -199,7 +199,7 @@ pub fn do_run(
             /* Launch proxy command*/
             let mut child = Command::new(SHELL_PATH)
                 .arg("-c")
-                .arg(&commandline)
+                .arg(commandline)
                 .stdout(Stdio::piped())
                 .stdin(Stdio::piped())
                 .spawn()

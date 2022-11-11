@@ -4,6 +4,7 @@ use crate::{
     utils_x11,
 };
 use anyhow::{Context, Result};
+use lock_keys::LockKeyWrapper;
 use sanzu_common::tunnel;
 
 use std::{
@@ -16,7 +17,6 @@ use std::{
 };
 
 use utils_x11::{get_clipboard_events, listen_clipboard};
-
 use x11_clipboard::Clipboard;
 
 use x11rb::{
@@ -129,6 +129,10 @@ pub struct ClientInfo {
     pub display_stats: bool,
     /// Bool to trig clipboard send
     pub clipbard_trig: bool,
+    /// Sync caps/num/scroll lock
+    pub sync_key_locks: bool,
+    /// is key lock sync needed
+    pub sync_key_locks_needed: bool,
 }
 
 fn create_gc<C: Connection>(
@@ -393,6 +397,8 @@ pub fn init_x11rb(
         skip_clipboard_clipboard,
         display_stats: false,
         clipbard_trig: false,
+        sync_key_locks: arguments.sync_key_locks,
+        sync_key_locks_needed: arguments.sync_key_locks,
     };
 
     Ok(Box::new(client_info))
@@ -545,6 +551,13 @@ fn shape_window(client_info: &mut ClientInfo, areas: &HashMap<usize, Area>) -> R
         .context("Error in free_pixmap")?;
 
     Ok(())
+}
+
+fn key_state_to_bool(state: lock_keys::LockKeyState) -> bool {
+    match state {
+        lock_keys::LockKeyState::Enabled => true,
+        lock_keys::LockKeyState::Disabled => false,
+    }
 }
 
 impl Client for ClientInfo {
@@ -739,6 +752,33 @@ impl Client for ClientInfo {
         let mut last_move = None;
         let mut last_resize = None;
         self.need_update = false;
+
+        if self.sync_key_locks && self.sync_key_locks_needed {
+            let lockkey = lock_keys::LockKey::new();
+            let caps_lock = lockkey
+                .state(lock_keys::LockKeys::CapitalLock)
+                .expect("Cannot get key state");
+            let num_lock = lockkey
+                .state(lock_keys::LockKeys::NumberLock)
+                .expect("Cannot get key state");
+            let scroll_lock = lockkey
+                .state(lock_keys::LockKeys::ScrollingLock)
+                .expect("Cannot get key state");
+
+            let eventkeysync = tunnel::EventKeyLocks {
+                caps_lock: key_state_to_bool(caps_lock),
+                num_lock: key_state_to_bool(num_lock),
+                scroll_lock: key_state_to_bool(scroll_lock),
+            };
+
+            let msg_event = tunnel::MessageClient {
+                msg: Some(tunnel::message_client::Msg::Keylocks(eventkeysync)),
+            };
+            events.push(msg_event);
+
+            self.sync_key_locks_needed = false;
+        }
+
         while let Some(event) = self
             .conn
             .poll_for_event()
@@ -842,6 +882,9 @@ impl Client for ClientInfo {
                     events.push(msg_event);
 
                     self.need_update = true;
+                    // If caps/num/scroll locks have changed during out of focus,
+                    // force keys state synchro
+                    self.sync_key_locks_needed = true;
                 }
                 Event::FocusOut(_) => {
                     trace!("Focus out");

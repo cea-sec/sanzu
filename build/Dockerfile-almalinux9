@@ -16,6 +16,7 @@ RUN set -eux; \
      gcc-c++ \
      protobuf-compiler \
      libxcb-devel \
+     libX11-devel \
      dbus-devel \
      clang-devel \
      krb5-devel \
