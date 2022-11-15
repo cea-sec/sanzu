@@ -55,7 +55,7 @@ default = ["kerberos"]
 
 [target.'cfg(windows)'.dependencies]
 clipboard-win = "4.4.1"
-ico = "0.1.0"
+ico = "0.2.0"
 tempfile = "3.3.0"
 winapi = { version = "0.3.9", features = [
   "impl-default", "winuser", "wingdi", "winbase", "libloaderapi", "processthreadsapi",
