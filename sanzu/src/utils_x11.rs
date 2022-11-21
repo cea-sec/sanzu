@@ -191,7 +191,7 @@ pub fn add_video_mode<C: Connection>(
         vsync_end: 1000,
         vtotal: 1000,
         name_len: name.len() as u16,
-        mode_flags: 6,
+        mode_flags: randr::ModeFlag::HSYNC_NEGATIVE | randr::ModeFlag::VSYNC_NEGATIVE,
     };
 
     let name_bytes: Vec<u8> = name.as_bytes().to_owned();
@@ -237,7 +237,7 @@ pub fn set_video_mode<C: Connection>(conn: &C, window: Window, mode: u32) -> Res
                 0,
                 0,
                 mode,
-                1u16, // rotation
+                randr::Rotation::ROTATE0,
                 &[*output],
             )
             .context("Error in set_crtc_config")?
