@@ -143,6 +143,23 @@ jobs:
         name: sanzu_msi
         path: ./target/wix/*.msi
 
+  docker-alpine:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt
+      - name: build
+        run: cargo clean && cd build && make alpine
+
+      - name: Upload resulting 'alpine bins'
+        uses: actions/upload-artifact@v3
+        with:
+          name: bins_alpine
+          path: ./target/release/sanzu_client
+
   docker-alma8:
     runs-on: ubuntu-latest
     steps:
