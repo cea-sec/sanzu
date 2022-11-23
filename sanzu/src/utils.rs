@@ -56,6 +56,8 @@ pub struct ArgumentsClient<'a> {
     pub printdir: Option<String>,
     pub proxycommand: Option<String>,
     pub sync_key_locks: bool,
+    pub video_shared_mem: Option<String>,
+    pub shm_is_xwd: bool,
 }
 
 pub struct ArgumentsProxy<'a> {

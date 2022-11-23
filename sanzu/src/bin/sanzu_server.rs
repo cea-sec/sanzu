@@ -122,7 +122,7 @@ Protocol version: {:?}
                 .help(
                     "Export video to a pci shared memory\n\
                      Example: if the video server runs in a vm,\n\
-                     the video buffer is exfiltrer using guest/host shared memory instead of\n\
+                     the video buffer is exfiltrated using guest/host shared memory instead of\n\
                      tcp or vsock",
                 ),
         )
