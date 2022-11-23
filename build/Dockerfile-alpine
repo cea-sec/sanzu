@@ -1,0 +1,8 @@
+FROM alpine:3.16.2
+
+RUN apk add --no-cache cargo cmake g++ ffmpeg protoc ffmpeg-dev x264 \
+    xcb-util linux-pam-dev curl bash \
+    krb5-dev alsa-lib-dev opus-dev clang-dev libx11-dev
+
+WORKDIR /SRC
+CMD cargo build $CARGO_OPT

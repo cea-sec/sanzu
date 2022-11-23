@@ -13,6 +13,13 @@ debian:
 	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGODEB_OPT="-p sanzu_broker" \
 		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:debian
 
+alpine:
+	docker build -t sanzu-builder:alpine -f Dockerfile-alpine .
+	docker run -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:alpine
+	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu-broker" \
+		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:alpine
+
 almalinux8:
 	docker build -t sanzu-builder:almalinux8 -f Dockerfile-almalinux8 .
 	docker run -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGORPM_OPT="-p sanzu" \
@@ -44,6 +51,7 @@ clean:
 
 mrproper: clean
 	docker image rm sanzu-builder:debian
+	docker image rm sanzu-builder:alpine
 	docker image rm sanzu-builder:almalinux8
 	docker image rm sanzu-builder:almalinux9
 	docker image rm sanzu-builder:windows
