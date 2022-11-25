@@ -1,10 +1,11 @@
 use anyhow::{Context, Result};
 extern crate libc;
+use memmap2::MmapOptions;
 use std::{collections::HashMap, fmt::Write as _, net::TcpStream, time::Instant};
 
 use std::{
     convert::TryInto,
-    io,
+    fs, io,
     io::Read,
     io::Write,
     process::{ChildStdin, ChildStdout, Command, Stdio},
@@ -28,7 +29,7 @@ use crate::{
     //proto::{Tunnel, ReadWrite},
     sound::SoundDecoder,
     utils::{
-        ArgumentsClient, MAX_BYTES_PER_LINE, MAX_CURSOR_HEIGHT, MAX_CURSOR_WIDTH,
+        get_xwd_data, ArgumentsClient, MAX_BYTES_PER_LINE, MAX_CURSOR_HEIGHT, MAX_CURSOR_WIDTH,
         MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
     },
     video_decoder::init_video_codec,
@@ -221,6 +222,22 @@ pub fn do_run(
             Box::new(stream)
         }
     };
+
+    let video_shared_mem = match arguments.video_shared_mem.as_deref() {
+        Some(shared_mem_file) => {
+            let file = fs::File::open(shared_mem_file)
+                .context(format!("Error in open shared mem {:?}", shared_mem_file))?;
+            unsafe {
+                Some(
+                    MmapOptions::new()
+                        .map(&file)
+                        .context("Error in map shared mem")?,
+                )
+            }
+        }
+        None => None,
+    };
+
     debug!("Connected");
 
     let tls_server_name_ok = arguments
@@ -415,13 +432,29 @@ pub fn do_run(
                     img_todo = Some((img.data, width, height));
                 }
                 Some(tunnel::message_srv::Msg::ImgRaw(img)) => {
-                    let (width, height) = check_img_size(img.width, img.height)
+                    let (data, width, height, bytes_per_line) = match &video_shared_mem {
+                        Some(ref video_shared_mem) => match arguments.shm_is_xwd {
+                            true => {
+                                let (data, _xwd_width, _xwd_height, bytes_per_line) =
+                                    get_xwd_data(video_shared_mem)?;
+                                (data.to_owned(), img.width, img.height, bytes_per_line)
+                            }
+                            false => {
+                                let size = img.bytes_per_line as usize * img.height as usize;
+                                let data = video_shared_mem[..size].to_owned();
+                                (data, img.width, img.height, img.bytes_per_line)
+                            }
+                        },
+                        _ => (img.data, img.width, img.height, img.bytes_per_line),
+                    };
+
+                    let (width, height) = check_img_size(width, height)
                         .map_err(|err| send_client_err_event(server, err))?;
-                    img_todo = Some((img.data, width, height));
-                    if img.bytes_per_line > MAX_BYTES_PER_LINE {
+                    img_todo = Some((data, width, height));
+                    if bytes_per_line > MAX_BYTES_PER_LINE {
                         return Err(anyhow!("Bytes per lines too big"));
                     }
-                    img_bytes_per_line = Some(img.bytes_per_line as u16);
+                    img_bytes_per_line = Some(bytes_per_line as u16);
                 }
                 Some(tunnel::message_srv::Msg::SoundEncoded(sound)) => {
                     if let Some(ref mut sound_obj) = sound_obj {

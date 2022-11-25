@@ -161,6 +161,25 @@ Ex: -j c:\user\dupond\printdir\
                 .action(ArgAction::SetTrue),
         )
         .arg(
+            Arg::new("import_video_shm")
+                .short('i')
+                .long("import_video_shm")
+                .num_args(1)
+                .help(
+                    "Input video from shared memory\n\
+                     Example: if the video server runs in a vm,\n\
+                     the video buffer is exfiltrated using guest/host shared memory instead of\n\
+                     tcp or vsock",
+                ),
+        )
+        .arg(
+            Arg::new("shm_is_xwd")
+                .help("Input from shared memory is in xwd format")
+                .short('y')
+                .long("shm_is_xwd")
+                .num_args(0),
+        )
+        .arg(
             Arg::new("proxycommand")
                 .short('p')
                 .long("proxycommand")
@@ -223,6 +242,8 @@ Ex: -j c:\user\dupond\printdir\
     };
     let proxycommand = matches.get_one::<String>("proxycommand").cloned();
     let sync_key_locks = matches.get_flag("sync_key_locks");
+    let import_video_shm = matches.get_one::<String>("import_video_shm").cloned();
+    let shm_is_xwd = matches.get_flag("shm_is_xwd");
 
     let arguments = ArgumentsClient {
         address: server_ip,
@@ -242,6 +263,8 @@ Ex: -j c:\user\dupond\printdir\
         printdir,
         proxycommand,
         sync_key_locks,
+        video_shared_mem: import_video_shm,
+        shm_is_xwd,
     };
 
     if let Err(err) = client::run(
