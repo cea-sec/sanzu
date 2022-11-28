@@ -133,6 +133,8 @@ pub struct ClientInfo {
     pub sync_key_locks: bool,
     /// is key lock sync needed
     pub sync_key_locks_needed: bool,
+    /// Stores windows
+    pub areas: HashMap<usize, Area>,
 }
 
 fn create_gc<C: Connection>(
@@ -399,6 +401,7 @@ pub fn init_x11rb(
         clipbard_trig: false,
         sync_key_locks: arguments.sync_key_locks,
         sync_key_locks_needed: arguments.sync_key_locks,
+        areas: HashMap::new(),
     };
 
     Ok(Box::new(client_info))
@@ -706,9 +709,8 @@ impl Client for ClientInfo {
     }
 
     fn update(&mut self, areas: &HashMap<usize, Area>) -> Result<()> {
-        if true {
-            //self.need_update {
-            trace!("Update");
+        if self.need_update {
+            debug!("Update");
             for area in areas.values() {
                 trace!("area: {:?}", area);
             }

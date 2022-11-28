@@ -564,8 +564,6 @@ pub fn do_run(
             };
         }
 
-        client.update(&areas).context("Error in update")?;
-
         let time_decode_msgs = Instant::now();
         let mut time_decode = None;
 
@@ -608,6 +606,8 @@ pub fn do_run(
                 time_decode = Some(timings);
             }
         }
+
+        client.update(&areas).context("Error in update")?;
 
         let time_stop = Instant::now();
 
