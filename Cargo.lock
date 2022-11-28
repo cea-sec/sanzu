@@ -1716,7 +1716,7 @@ checksum = "9b7820b9daea5457c9f21c69448905d723fbd21136ccf521748f23fd49e723ee"
 [[package]]
 name = "pam"
 version = "0.7.0"
-source = "git+https://github.com/serpilliere/pam.git?branch=fix_env_parsing#56a3e244dd13f5be98a62f180fab1bf0aae52402"
+source = "git+https://github.com/serpilliere/pam.git?branch=fix_env_parsing#a65741d5a566c527cc5ce2624b0b15bed53918a1"
 dependencies = [
  "libc",
  "memchr",
