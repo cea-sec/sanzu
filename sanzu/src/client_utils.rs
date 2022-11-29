@@ -1,7 +1,7 @@
 use sanzu_common::tunnel;
 
 use anyhow::Result;
-use std::collections::HashMap;
+use std::{cmp::Ordering, collections::HashMap};
 
 /// Holds information on a server side window.
 ///
@@ -12,6 +12,55 @@ pub struct Area {
     pub size: (u16, u16),
     pub position: (i16, i16),
     pub mapped: bool,
+}
+
+impl Eq for Area {}
+
+impl Ord for Area {
+    fn cmp(&self, other: &Self) -> Ordering {
+        let ret = self.id.cmp(&other.id);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+
+        let ret = self.size.cmp(&other.size);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        let ret = self.position.cmp(&other.position);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        self.mapped.cmp(&other.mapped)
+    }
+}
+
+impl PartialEq for Area {
+    fn eq(&self, other: &Self) -> bool {
+        self.id == other.id
+            && self.position == other.position
+            && self.size == other.size
+            && self.mapped == other.mapped
+    }
+}
+
+impl PartialOrd for Area {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        let ret = self.id.partial_cmp(&other.id);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+
+        let ret = self.size.partial_cmp(&other.size);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        let ret = self.position.partial_cmp(&other.position);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        self.mapped.partial_cmp(&other.mapped)
+    }
 }
 
 pub trait Client {

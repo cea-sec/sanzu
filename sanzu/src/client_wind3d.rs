@@ -1301,55 +1301,6 @@ pub fn init_wind3d(
     Ok(Box::new(client_info))
 }
 
-impl Eq for Area {}
-
-impl Ord for Area {
-    fn cmp(&self, other: &Self) -> Ordering {
-        let ret = self.id.cmp(&other.id);
-        if ret != Ordering::Equal {
-            return ret;
-        }
-
-        let ret = self.size.cmp(&other.size);
-        if ret != Ordering::Equal {
-            return ret;
-        }
-        let ret = self.position.cmp(&other.position);
-        if ret != Ordering::Equal {
-            return ret;
-        }
-        self.mapped.cmp(&other.mapped)
-    }
-}
-
-impl PartialEq for Area {
-    fn eq(&self, other: &Self) -> bool {
-        self.id == other.id
-            && self.position == other.position
-            && self.size == other.size
-            && self.mapped == other.mapped
-    }
-}
-
-impl PartialOrd for Area {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let ret = self.id.partial_cmp(&other.id);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-
-        let ret = self.size.partial_cmp(&other.size);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.position.partial_cmp(&other.position);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        self.mapped.partial_cmp(&other.mapped)
-    }
-}
-
 impl Client for ClientWindows {
     fn size(&self) -> (u16, u16) {
         (self.width, self.height)
@@ -1377,8 +1328,10 @@ impl Client for ClientWindows {
         let mut areas_vec = vec![];
         trace!("updae");
         for area in areas.values() {
-            areas_vec.push(area.clone());
-            trace!("area {:?}", area);
+            if area.mapped {
+                areas_vec.push(area.clone());
+                trace!("area {:?}", area);
+            }
         }
         areas_vec.sort();
         if areas_vec != self.cur_areas {

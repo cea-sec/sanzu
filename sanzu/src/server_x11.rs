@@ -18,7 +18,7 @@ use sanzu_common::tunnel;
 
 use std::{
     cmp::Ordering,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::{self, OpenOptions},
     io::{Cursor, Write},
     ptr::null_mut,
@@ -273,29 +273,17 @@ fn init_grab<C: Connection>(
 }
 
 /// Creates Area linked to a `window`
-pub fn init_area<C: Connection>(conn: &C, window: Window, root: Window) -> Result<Area> {
+pub fn init_area<C: Connection>(conn: &C, window: Window) -> Result<Area> {
     let geometry = conn
         .get_geometry(window)
         .context("Error in get geometry")?
         .reply()
         .context("Error in get geometry reply")?;
-    let atom_string_hidden = conn
-        .intern_atom(false, b"_NET_WM_STATE_HIDDEN")
-        .context("Error in intern_atom")?
-        .reply()
-        .context("Error in intern_atom reply")?;
-    let atom_hidden_a: Atom = atom_string_hidden.atom;
-    let mut mapped = true;
-    if let Ok(client_list) = get_client_list(conn, root) {
-        if let Ok(children) = get_window_childs(conn, window) {
-            for child in children {
-                if client_list.contains(&child) {
-                    if let Ok(states) = get_window_state(conn, child) {
-                        if states.contains(&atom_hidden_a) {
-                            mapped = false;
-                        }
-                    }
-                }
+    let mut mapped = false;
+    if let Ok(reply) = conn.get_window_attributes(window) {
+        if let Ok(attributes) = reply.reply() {
+            if attributes.map_state == MapState::VIEWABLE {
+                mapped = true;
             }
         }
     }
@@ -783,26 +771,58 @@ pub fn init_x11rb(
     .context("Error in init_grab")?;
 
     let mut areas = HashMap::new();
+    let mut known_windows = HashSet::new();
 
     let setup = conn.setup();
     let screen = &setup.roots[screen_num];
     let root = screen.root;
 
+    /* Add WM windows */
     let windows = get_client_list(&conn, root).context("Error in get_client_list")?;
-    info!("Windows: {:?}", windows);
+    debug!("Windows: {:?} Root: {:?}", windows, root);
 
     let result = get_windows_parents(&conn, screen.root).context("Error in get_windows_parents")?;
-    for (index, (target_root, target)) in result.into_iter().enumerate() {
+    let mut index = 0;
+    for (target_root, target) in result.into_iter() {
         if !windows.contains(&target_root) {
             continue;
         }
-        info!("Window found {:?} {:?}", target_root, target);
+        trace!("Window found {:?} {:?}", target_root, target);
 
         let target_window = target;
-        let area = init_area(&conn, target_window, root).context("Error in init_area")?;
-        if area.size.0 > 1 && area.size.1 > 1 {
-            areas.insert(index, area);
+        if known_windows.contains(&target_window) {
+            continue;
         }
+        let area = init_area(&conn, target_window).context("Error in init_area")?;
+        if area.size.0 > 1 && area.size.1 > 1 {
+            known_windows.insert(area.drawable);
+            areas.insert(index, area);
+            index += 1;
+        }
+    }
+
+    /* Add root's chidren windows */
+    let children = get_window_childs(&conn, root).context("Cannot get root children")?;
+    debug!("ROOT Windows: {}", children.len());
+    for window in children {
+        if known_windows.contains(&window) {
+            continue;
+        }
+        if let Ok(reply) = conn.get_window_attributes(window) {
+            if let Ok(attributes) = reply.reply() {
+                trace!("    Attr: {:?}", attributes);
+                if attributes.map_state == MapState::VIEWABLE && attributes.map_is_installed {
+                    let area = init_area(&conn, window).context("Error in init_area")?;
+                    known_windows.insert(area.drawable);
+                    areas.insert(index, area);
+                    index += 1;
+                }
+            }
+        }
+    }
+
+    for (id, area) in areas.iter() {
+        trace!("    {}:{:?}", id, area);
     }
 
     /* Register window structure modifications */
@@ -966,20 +986,12 @@ fn reparent_window(server: &mut ServerX11, window: Window, parent: Window) -> bo
 }
 
 /// Create and link an area to a window
-fn create_area(server: &mut ServerX11, window: Window, root: Window) -> bool {
+fn create_area(server: &mut ServerX11, window: Window) -> bool {
     if server.root == window {
         // Avoid root window
         return false;
     }
     let mut found = false;
-    if let Ok(reply) = server.conn.get_window_attributes(window) {
-        if let Ok(attributes) = reply.reply() {
-            if attributes.map_state == MapState::from(0) {
-                // Window is not mapped => skip it
-                return false;
-            }
-        }
-    }
 
     for (_index, area) in server.areas.iter() {
         if area.drawable == window {
@@ -991,10 +1003,7 @@ fn create_area(server: &mut ServerX11, window: Window, root: Window) -> bool {
         return false;
     }
 
-    if let Ok(area) = init_area(&server.conn, window, root) {
-        if area.size.0 <= 1 || area.size.1 <= 1 {
-            return false;
-        }
+    if let Ok(area) = init_area(&server.conn, window) {
         // find first free id, insert area
         for index in 0.. {
             if server.areas.get(&index).is_none() {
@@ -1044,12 +1053,10 @@ fn update_area(
     y: i16,
     width: u16,
     height: u16,
-    map: bool,
 ) -> bool {
     for (_, area) in server.areas.iter_mut() {
         trace!("Known window {:?} {:?}", area.drawable, area);
         if area.drawable == window {
-            area.mapped = map;
             area.position = (x, y);
             area.size = (width, height);
             return true;
@@ -1264,13 +1271,27 @@ impl Server for ServerX11 {
                 Event::NoExposure(_event) => {}
 
                 Event::CreateNotify(event) => {
-                    trace!("{:?}", event);
-                    if create_area(self, event.window, self.root) {
+                    trace!("CreateNotify: {:?}", event);
+                    if create_area(self, event.window) {
                         self.modified_area = true;
                     }
                 }
                 Event::MapNotify(event) => {
                     trace!("{:?}", event);
+                    let mut found_window = None;
+                    for (index, area) in self.areas.iter() {
+                        if area.drawable == event.window {
+                            trace!("Window known {:?}", event.window);
+                            found_window = Some(*index);
+                            break;
+                        }
+                    }
+                    if found_window.is_none() {
+                        debug!("Unknown window, adding");
+                        if create_area(self, event.window) {
+                            self.modified_area = true;
+                        }
+                    }
                     if map_area(self, event.window, true) {
                         self.modified_area = true;
                     }
@@ -1304,7 +1325,6 @@ impl Server for ServerX11 {
                         event.y,
                         event.width,
                         event.height,
-                        true,
                     ) {
                         self.modified_area = true;
                     }
