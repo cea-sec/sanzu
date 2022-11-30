@@ -133,6 +133,8 @@ pub struct ClientInfo {
     pub sync_key_locks: bool,
     /// is key lock sync needed
     pub sync_key_locks_needed: bool,
+    /// Stores windows
+    pub areas: Vec<(usize, Area)>,
 }
 
 fn create_gc<C: Connection>(
@@ -399,6 +401,7 @@ pub fn init_x11rb(
         clipbard_trig: false,
         sync_key_locks: arguments.sync_key_locks,
         sync_key_locks_needed: arguments.sync_key_locks,
+        areas: vec![],
     };
 
     Ok(Box::new(client_info))
@@ -706,14 +709,18 @@ impl Client for ClientInfo {
     }
 
     fn update(&mut self, areas: &HashMap<usize, Area>) -> Result<()> {
-        if true {
-            //self.need_update {
-            trace!("Update");
-            for area in areas.values() {
-                trace!("area: {:?}", area);
-            }
+        if self.need_update {
             if self.seamless {
-                shape_window(self, areas).context("Error in shape_window")?;
+                let mut distant_areas: Vec<(usize, Area)> =
+                    areas.iter().map(|(a, b)| (*a, b.clone())).collect();
+                distant_areas.sort();
+                if distant_areas != self.areas {
+                    for area in distant_areas.iter() {
+                        trace!("    {:?}", area);
+                    }
+                    shape_window(self, areas).context("Error in shape_window")?;
+                    self.areas = distant_areas;
+                }
             }
             self.conn
                 .copy_area(
