@@ -19,7 +19,7 @@ env_logger = "0.10"
 libc = "0.2"
 log = "0.4"
 mio = { version = "0.8", features = ["net", "os-poll"] }
-nix = "0.25"
+nix = "0.26"
 rustls = "0.20"
 rustls-pemfile = "1.0"
 sanzu-common = { path="../sanzu-common", default-features = false }
