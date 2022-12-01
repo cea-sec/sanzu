@@ -11,6 +11,7 @@ use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
     ffi::CString,
+    iter::FromIterator,
     ptr::null_mut,
     sync::{
         atomic,
@@ -111,8 +112,11 @@ const WM_WTSSESSION_CHANGE: DWORD = 0x2B1;
 const WTS_SESSION_UNLOCK: DWORD = 0x8;
 const MIN_CURSOR_SIZE: u32 = 32;
 
+const SANZU_NAME: &str = "Sanzu";
+const SANZU_CLASS: &str = "Sanzu-class";
+
 enum AreaManager {
-    CreateArea(usize),
+    CreateArea(usize, String),
     DeleteArea(usize),
 }
 
@@ -148,9 +152,9 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
     }
     // XXX TODO: get windows window border thickness or set it to 0
     let border_size = 3;
-    info!("areas:");
+    trace!("areas:");
     for area in zones {
-        info!("region {:?}", area);
+        trace!("region {:?}", area);
         if !area.mapped {
             continue;
         }
@@ -1073,7 +1077,7 @@ pub fn init_wind3d(
     thread::spawn(move || {
         let instance_handle = unsafe { GetModuleHandleA(null_mut()) };
         info!("Create window {} {}", screen_width, screen_height);
-        let class_name = CString::new("D3D").expect("Error in create CString D3D");
+        let class_name = CString::new(SANZU_CLASS).expect("Error in create CString class name");
         let class_name_ptr = class_name.as_ptr();
         let wc = WNDCLASSEXA {
             cbSize: std::mem::size_of::<WNDCLASSEXA>() as u32,
@@ -1104,7 +1108,7 @@ pub fn init_wind3d(
         };
         info!("img {:?}", img);
 
-        let window_name = CString::new("D3D").expect("Error in create CString D3D");
+        let window_name = CString::new(SANZU_NAME).expect("Error in create CString name");
         let window_name_ptr = window_name.as_ptr();
 
         let mut window_style = WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;
@@ -1217,7 +1221,7 @@ pub fn init_wind3d(
                 // Only keep last areas
                 if let Ok(areas) = shape_receiver.recv() {
                     if seamless {
-                        info!("receive shape {:?}", areas);
+                        trace!("receive shape {:?}", areas);
                         set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
                     }
                 }
@@ -1242,10 +1246,10 @@ pub fn init_wind3d(
                     continue;
                 }
                 match area_mngr {
-                    AreaManager::CreateArea(id) => {
+                    AreaManager::CreateArea(id, name) => {
                         let instance_handle = unsafe { GetModuleHandleA(null_mut()) };
 
-                        let window_name = CString::new(format!("Window {}", id))
+                        let window_name = CString::new(format!("{}: {}", id, name))
                             .expect("Error in create CString D3D");
                         let window_name_ptr = window_name.as_ptr();
                         let window: HWND = unsafe {
@@ -1325,14 +1329,8 @@ impl Client for ClientWindows {
     }
 
     fn update(&mut self, areas: &HashMap<usize, Area>) -> Result<()> {
-        let mut areas_vec = vec![];
-        trace!("updae");
-        for area in areas.values() {
-            if area.mapped {
-                areas_vec.push(area.clone());
-                trace!("area {:?}", area);
-            }
-        }
+        trace!("update {:?}", areas);
+        let mut areas_vec: Vec<Area> = areas.values().cloned().collect();
         areas_vec.sort();
         if areas_vec != self.cur_areas {
             debug!("Send new shape");
@@ -1362,16 +1360,30 @@ impl Client for ClientWindows {
             }
 
             for area in areas_added.iter() {
+                if !area.is_app {
+                    continue;
+                }
                 info!("Win added {:?}", area);
+                /* Remove special char for windows title */
+                let name = String::from_iter(area.name.chars().map(|c| {
+                    if c.is_ascii_graphic() {
+                        c
+                    } else {
+                        ' '
+                    }
+                }));
                 WINDOW_SENDER
                     .lock()
                     .unwrap()
                     .as_mut()
                     .unwrap()
-                    .send(AreaManager::CreateArea(area.id))
+                    .send(AreaManager::CreateArea(area.id, name))
                     .expect("Cannot send window");
             }
             for area in areas_subbed.iter() {
+                if !area.is_app {
+                    continue;
+                }
                 info!("Win subbed {:?}", area);
                 WINDOW_SENDER
                     .lock()

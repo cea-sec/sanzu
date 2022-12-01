@@ -994,6 +994,8 @@ impl Server for ServerInfo {
                 width: area.size.0 as u32,
                 height: area.size.1 as u32,
                 mapped: area.mapped,
+                is_app: true,
+                name: "".to_string(),
             };
             let event_area_updt = tunnel::message_srv::Msg::AreaUpdt(area_new);
             let event_area_updt = tunnel::MessageSrv {

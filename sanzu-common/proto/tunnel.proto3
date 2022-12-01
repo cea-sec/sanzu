@@ -118,6 +118,8 @@ message EventAreaUpdt {
   int32 x = 4;
   int32 y = 5;
   bool mapped = 6;
+  bool is_app = 7;
+  string name = 8;
 };
 
 message EventStats  {

@@ -12,6 +12,8 @@ pub struct Area {
     pub size: (u16, u16),
     pub position: (i16, i16),
     pub mapped: bool,
+    pub is_app: bool,
+    pub name: String,
 }
 
 impl Eq for Area {}
@@ -31,7 +33,15 @@ impl Ord for Area {
         if ret != Ordering::Equal {
             return ret;
         }
-        self.mapped.cmp(&other.mapped)
+        let ret = self.mapped.cmp(&other.mapped);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        let ret = self.is_app.cmp(&other.is_app);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        self.name.cmp(&other.name)
     }
 }
 
@@ -41,6 +51,8 @@ impl PartialEq for Area {
             && self.position == other.position
             && self.size == other.size
             && self.mapped == other.mapped
+            && self.is_app == other.is_app
+            && self.name == other.name
     }
 }
 
@@ -59,7 +71,15 @@ impl PartialOrd for Area {
         if ret != Some(Ordering::Equal) {
             return ret;
         }
-        self.mapped.partial_cmp(&other.mapped)
+        let ret = self.mapped.partial_cmp(&other.mapped);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        let ret = self.is_app.partial_cmp(&other.is_app);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        self.name.partial_cmp(&other.name)
     }
 }
 
