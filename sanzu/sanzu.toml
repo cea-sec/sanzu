@@ -77,3 +77,19 @@ async_depth = "1"
 
 [ffmpeg.h264_v4l2m2m]
 pixel_format = "yuv420p"
+
+[ffmpeg.h264_amf]
+#pixel_format possible values "yuv420p" "nv12"
+pixel_format = "yuv420p"
+#usage possible values  "ultralowlatency" "lowlatency"
+usage = "ultralowlatency"
+#quality possible values "speed" "balanced" "quality"
+quality = "balanced"
+
+[ffmpeg.hevc_amf]
+#pixel_format possible values "yuv420p" "nv12"
+pixel_format = "yuv420p"
+#usage possible values  "ultralowlatency" "lowlatency"
+usage = "ultralowlatency"
+#quality possible values "speed" "balanced" "quality"
+quality = "balanced"
