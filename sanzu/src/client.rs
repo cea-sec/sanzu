@@ -493,6 +493,8 @@ pub fn do_run(
                         size: (area_updt.width as u16, area_updt.height as u16),
                         position: (area_updt.x as i16, area_updt.y as i16),
                         mapped: area_updt.mapped,
+                        is_app: area_updt.is_app,
+                        name: area_updt.name.clone(),
                     };
                     areas.insert(area_updt.id as usize, area);
                 }

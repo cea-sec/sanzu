@@ -10,6 +10,7 @@ use anyhow::{Context, Result};
 use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
 #[cfg(feature = "notify")]
 use dbus::channel::MatchingReceiver;
+use encoding_rs::mem::decode_latin1;
 
 use libc::{self, shmat, shmctl, shmdt, shmget};
 use lock_keys::LockKeyWrapper;
@@ -64,6 +65,8 @@ pub struct Area {
     pub position: (i16, i16),
     pub size: (u16, u16),
     pub mapped: bool,
+    pub is_app: bool,
+    pub name: String,
 }
 
 impl Eq for Area {}
@@ -83,7 +86,15 @@ impl Ord for Area {
         if ret != Ordering::Equal {
             return ret;
         }
-        self.mapped.cmp(&other.mapped)
+        let ret = self.mapped.cmp(&other.mapped);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        let ret = self.is_app.cmp(&other.is_app);
+        if ret != Ordering::Equal {
+            return ret;
+        }
+        self.name.cmp(&other.name)
     }
 }
 
@@ -93,6 +104,8 @@ impl PartialEq for Area {
             && self.position == other.position
             && self.size == other.size
             && self.mapped == other.mapped
+            && self.is_app == other.is_app
+            && self.name == other.name
     }
 }
 
@@ -111,11 +124,19 @@ impl PartialOrd for Area {
         if ret != Some(Ordering::Equal) {
             return ret;
         }
-        self.mapped.partial_cmp(&other.mapped)
+        let ret = self.mapped.partial_cmp(&other.mapped);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        let ret = self.is_app.partial_cmp(&other.is_app);
+        if ret != Some(Ordering::Equal) {
+            return ret;
+        }
+        self.name.partial_cmp(&other.name)
     }
 }
 
-fn get_window_childs<C: Connection>(conn: &C, window: Window) -> Result<Vec<Window>> {
+fn get_window_children<C: Connection>(conn: &C, window: Window) -> Result<Vec<Window>> {
     // Find children
     let response = conn
         .query_tree(window)
@@ -141,9 +162,9 @@ fn get_windows_parents<C: Connection>(conn: &C, window: Window) -> Result<HashMa
     let mut out = HashMap::new();
 
     for parent in response.children {
-        if let Ok(children) = get_window_childs(conn, parent) {
+        if let Ok(children) = get_window_children(conn, parent) {
             for child in children {
-                debug!("  child {:?} parent {:?}", child, parent);
+                debug!("  child {:x} parent {:x}", child, parent);
                 out.insert(child, parent);
             }
         } else {
@@ -273,7 +294,7 @@ fn init_grab<C: Connection>(
 }
 
 /// Creates Area linked to a `window`
-pub fn init_area<C: Connection>(conn: &C, window: Window) -> Result<Area> {
+pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Result<Area> {
     let geometry = conn
         .get_geometry(window)
         .context("Error in get geometry")?
@@ -287,11 +308,36 @@ pub fn init_area<C: Connection>(conn: &C, window: Window) -> Result<Area> {
             }
         }
     }
+    let app_list = get_client_list(conn, root).context("Error in get_client_list")?;
+
+    trace!("init area {:x}", window);
+
+    let mut app_name = "".to_string();
+    let is_app = if let Ok(windows_children) = get_window_children(conn, window) {
+        let mut found = false;
+
+        for child in windows_children.iter() {
+            if app_list.contains(child) {
+                if let Ok(name) = get_window_name(conn, *child) {
+                    app_name = name;
+                }
+                trace!("child {:x}: {}", *child, app_name);
+                found = true;
+                break;
+            }
+        }
+        found
+    } else {
+        false
+    };
+
     Ok(Area {
         drawable: window,
         position: (geometry.x, geometry.y),
         size: (geometry.width, geometry.height),
         mapped,
+        is_app,
+        name: app_name,
     })
 }
 
@@ -305,6 +351,8 @@ pub struct ServerX11 {
     pub max_stall_img: u32,
     /// Areas handled by the server
     pub areas: HashMap<usize, Area>,
+    /// Windows app handles
+    pub apps: Vec<Window>,
     /// Number of encoded frames
     pub img_count: i64,
     /// x11 screen index
@@ -396,6 +444,25 @@ pub fn get_window_state<C: Connection>(conn: &C, window: Window) -> Result<Vec<W
         states.push(window as Window);
     }
     Ok(states)
+}
+
+pub fn get_window_name<C: Connection>(conn: &C, window: Window) -> Result<String> {
+    let atom_string_target = conn
+        .intern_atom(false, b"_NET_WM_NAME")
+        .context("Error in intern_atom")?
+        .reply()
+        .context("Error in intern_atom reply")?;
+    let atom_property_a: Atom = atom_string_target.atom;
+    let ret = conn
+        .get_property(false, window, atom_property_a, 0u32, 0, 0xFFFF)
+        .context("Error in get_property")?
+        .reply()
+        .context("Error in get_property reply")?;
+    let value: String = match std::str::from_utf8(&ret.value) {
+        Ok(value) => value.into(),
+        Err(_) => decode_latin1(&ret.value).into(),
+    };
+    Ok(value)
 }
 
 #[cfg(feature = "notify")]
@@ -778,13 +845,20 @@ pub fn init_x11rb(
     let root = screen.root;
 
     /* Add WM windows */
-    let windows = get_client_list(&conn, root).context("Error in get_client_list")?;
-    debug!("Windows: {:?} Root: {:?}", windows, root);
+    let app_list = get_client_list(&conn, root).context("Error in get_client_list")?;
+    debug!(
+        "Windows: {:?} Root: {:x}",
+        app_list
+            .iter()
+            .map(|window| format!("{:x}", window))
+            .collect::<Vec<String>>(),
+        root
+    );
 
     let result = get_windows_parents(&conn, screen.root).context("Error in get_windows_parents")?;
     let mut index = 0;
     for (target_root, target) in result.into_iter() {
-        if !windows.contains(&target_root) {
+        if !app_list.contains(&target_root) {
             continue;
         }
         trace!("Window found {:?} {:?}", target_root, target);
@@ -793,7 +867,7 @@ pub fn init_x11rb(
         if known_windows.contains(&target_window) {
             continue;
         }
-        let area = init_area(&conn, target_window).context("Error in init_area")?;
+        let area = init_area(&conn, root, target_window).context("Error in init_area")?;
         if area.size.0 > 1 && area.size.1 > 1 {
             known_windows.insert(area.drawable);
             areas.insert(index, area);
@@ -802,7 +876,7 @@ pub fn init_x11rb(
     }
 
     /* Add root's chidren windows */
-    let children = get_window_childs(&conn, root).context("Cannot get root children")?;
+    let children = get_window_children(&conn, root).context("Cannot get root children")?;
     debug!("ROOT Windows: {}", children.len());
     for window in children {
         if known_windows.contains(&window) {
@@ -812,7 +886,7 @@ pub fn init_x11rb(
             if let Ok(attributes) = reply.reply() {
                 trace!("    Attr: {:?}", attributes);
                 if attributes.map_state == MapState::VIEWABLE && attributes.map_is_installed {
-                    let area = init_area(&conn, window).context("Error in init_area")?;
+                    let area = init_area(&conn, root, window).context("Error in init_area")?;
                     known_windows.insert(area.drawable);
                     areas.insert(index, area);
                     index += 1;
@@ -909,6 +983,7 @@ pub fn init_x11rb(
         conn,
         max_stall_img: config.video.max_stall_img,
         areas,
+        apps: app_list,
         grabinfo,
         img_count: 0,
         screen_num,
@@ -986,7 +1061,7 @@ fn reparent_window(server: &mut ServerX11, window: Window, parent: Window) -> bo
 }
 
 /// Create and link an area to a window
-fn create_area(server: &mut ServerX11, window: Window) -> bool {
+fn create_area(server: &mut ServerX11, root: Window, window: Window) -> bool {
     if server.root == window {
         // Avoid root window
         return false;
@@ -1003,7 +1078,7 @@ fn create_area(server: &mut ServerX11, window: Window) -> bool {
         return false;
     }
 
-    if let Ok(area) = init_area(&server.conn, window) {
+    if let Ok(area) = init_area(&server.conn, root, window) {
         // find first free id, insert area
         for index in 0.. {
             if server.areas.get(&index).is_none() {
@@ -1272,7 +1347,7 @@ impl Server for ServerX11 {
 
                 Event::CreateNotify(event) => {
                     trace!("CreateNotify: {:?}", event);
-                    if create_area(self, event.window) {
+                    if create_area(self, self.root, event.window) {
                         self.modified_area = true;
                     }
                 }
@@ -1288,7 +1363,7 @@ impl Server for ServerX11 {
                     }
                     if found_window.is_none() {
                         debug!("Unknown window, adding");
-                        if create_area(self, event.window) {
+                        if create_area(self, self.root, event.window) {
                             self.modified_area = true;
                         }
                     }
@@ -1358,8 +1433,9 @@ impl Server for ServerX11 {
             self.frozen_frames_count += 1;
         }
         /* Push areas infos */
-        debug!("push areas");
+        trace!("push areas");
         for (index, area) in self.areas.iter() {
+            trace!("area {:x} {:?} {}", area.drawable, area.is_app, area.name);
             let area_new = tunnel::EventAreaUpdt {
                 id: *index as u32,
                 x: area.position.0 as i32,
@@ -1367,6 +1443,8 @@ impl Server for ServerX11 {
                 width: area.size.0 as u32,
                 height: area.size.1 as u32,
                 mapped: area.mapped,
+                is_app: area.is_app,
+                name: area.name.clone(),
             };
             let event_area_updt = tunnel::message_srv::Msg::AreaUpdt(area_new);
             let event_area_updt = tunnel::MessageSrv {
@@ -1608,7 +1686,7 @@ impl Server for ServerX11 {
 
         if let Some(area) = self.areas.get(&(win_id as usize)) {
             if let Ok(client_list) = get_client_list(&self.conn, self.root) {
-                if let Ok(children) = get_window_childs(&self.conn, area.drawable) {
+                if let Ok(children) = get_window_children(&self.conn, area.drawable) {
                     for child in children {
                         if client_list.contains(&child) {
                             let event = ClientMessageEvent {
