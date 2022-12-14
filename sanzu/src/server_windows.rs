@@ -457,6 +457,49 @@ fn acquire_dxgi_frame() -> Result<(Vec<u8>, u32, u32, u32)> {
         return result;
     }
     debug!("frame acquired!");
+
+    if frame_info.PointerShapeBufferSize != 0 {
+        debug!("pointer size {}", frame_info.PointerShapeBufferSize);
+        let mut pointer = vec![0u8; frame_info.PointerShapeBufferSize as usize];
+        let mut buffer_size_required = 0;
+        let mut shape_info = dxgi1_2::DXGI_OUTDUPL_POINTER_SHAPE_INFO::default();
+        let ret = unsafe {
+            idxgioutputduplication.GetFramePointerShape(
+                frame_info.PointerShapeBufferSize,
+                pointer.as_mut_ptr() as *mut c_void,
+                &mut buffer_size_required,
+                &mut shape_info,
+            )
+        };
+        if ret == 0 {
+            debug!(
+                "pointer info {:?} {}x{}",
+                shape_info.Type, shape_info.Width, shape_info.Height
+            );
+            if shape_info.Type == dxgi1_2::DXGI_OUTDUPL_POINTER_SHAPE_TYPE_COLOR {
+                let cursor_event = tunnel::EventCursor {
+                    data: pointer,
+                    width: shape_info.Width as u32,
+                    height: shape_info.Height as u32,
+                    xhot: shape_info.HotSpot.x as u32,
+                    yhot: shape_info.HotSpot.y as u32,
+                };
+                let msg_cursor = tunnel::MessageSrv {
+                    msg: Some(tunnel::message_srv::Msg::Cursor(cursor_event)),
+                };
+                EVENT_SENDER
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .send(msg_cursor)
+                    .expect("Cannot send event cursor");
+            } else {
+                error!("Unsupported pointer type {:?}", shape_info.Type);
+            }
+        }
+    }
+
     let desktop_resource =
         unsafe { p_desktop_resource.as_ref() }.context("p_desktop_resource is null")?;
 
@@ -620,7 +663,8 @@ pub fn init_d3d11() -> Result<()> {
                 )
             };
             if !SUCCEEDED(ret) {
-                return Err(anyhow!("Cannot dup output"));
+                error!("Cannot dup output {:x}", ret);
+                continue;
             }
             P_OUTPUTDUPLICATION.store(p_idxgioutputduplication, atomic::Ordering::Release);
 

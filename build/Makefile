@@ -39,12 +39,12 @@ windows:
 	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGO_OPT="-p sanzu --release" sanzu-builder:windows
 	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} sanzu-builder:windows bash -c \
 		"cd /usr/x86_64-w64-mingw32/lib/ \
-                ; cp ../bin/libopus-0.dll swscale-*.dll postproc-*.dll \
+		; cp ../bin/libopus-0.dll swscale-*.dll postproc-*.dll \
 		     avutil-*.dll avdevice-*.dll avcodec-*.dll \
 		     swresample-*.dll ../bin/libssp-*.dll \
 		 /SRC/target/x86_64-pc-windows-gnu/release/"
 	mkdir ../target/windows
-	cd ../target/x86_64-pc-windows-gnu/release ; 7z a ../../windows/sanzu-$(SANZU_VERSION)-x86_64-pc-windows-gnu.zip sanzu_client.exe *.dll
+	cd ../target/x86_64-pc-windows-gnu/release ; 7z a ../../windows/sanzu-$(SANZU_VERSION)-x86_64-pc-windows-gnu.zip sanzu_client.exe sanzu_server.exe *.dll
 
 clean:
 	rm -fr ../target/
