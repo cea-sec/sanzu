@@ -332,6 +332,34 @@ fn d3d11_get_device_idxgidevice(device: &d3d11::ID3D11Device) -> Result<&dxgi::I
     unsafe { p_idxgidevice.as_ref() }.context("Null idxgiadapter")
 }
 
+fn d3d11_get_device_idxgidevice1(device: &d3d11::ID3D11Device) -> Result<&dxgi::IDXGIDevice1> {
+    /* GUID_ENTRY(0x77db970f,0x6276,0x48ba,0xba,0x28,0x07,0x01,0x43,0xb4,0x39,0x2c,IID_IDXGIDevice1) */
+    let riid_idxgidevice1 = GUID {
+        Data1: 0x77db970f,
+        Data2: 0x6276,
+        Data3: 0x48ba,
+        Data4: [0xba, 0x28, 0x07, 0x01, 0x43, 0xb4, 0x39, 0x2c],
+    };
+
+    let mut p_idxgidevice1: *mut c_void = null_mut();
+
+    let ret = unsafe {
+        device.QueryInterface(
+            &riid_idxgidevice1 as *const _,
+            &mut p_idxgidevice1 as *mut _,
+        )
+    };
+
+    if SUCCEEDED(ret) {
+        info!("Query interface success {:?}", p_idxgidevice1);
+    } else {
+        error!("Error in queryinterface");
+        return Err(anyhow!("Error in query interface idxgidevice1"));
+    }
+    let p_idxgidevice1: *mut dxgi::IDXGIDevice1 = unsafe { std::mem::transmute(p_idxgidevice1) };
+    unsafe { p_idxgidevice1.as_ref() }.context("Null idxgiadapter1")
+}
+
 fn d3d11_get_idxgidevice_idxgiadapter(
     idxgidevice: &dxgi::IDXGIDevice,
 ) -> Result<&dxgi::IDXGIAdapter> {
@@ -643,6 +671,11 @@ pub fn init_d3d11() -> Result<()> {
 
         let idxgidevice =
             d3d11_get_device_idxgidevice(d3d11_device).context("Cannot get idxgidevice")?;
+
+        if let Ok(idxgidevice1) = d3d11_get_device_idxgidevice1(d3d11_device) {
+            let ret = unsafe { idxgidevice1.SetMaximumFrameLatency(1) };
+            error!("Set max frame latency: {:x}", ret);
+        }
 
         let idxgiadapter =
             d3d11_get_idxgidevice_idxgiadapter(idxgidevice).context("Cannot get idxgiadapter")?;
