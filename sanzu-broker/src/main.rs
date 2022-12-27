@@ -70,6 +70,7 @@ pub fn replace_source(args: &[String], needle: &str, new_str: &str) -> Vec<Strin
 fn auth_client(
     config: &Config,
     mut socket: &mut std::net::TcpStream,
+    addr: &SocketAddr,
 ) -> Result<(ServerConnection, String, tunnel::Version)> {
     socket.set_nodelay(true)?;
 
@@ -105,7 +106,7 @@ fn auth_client(
 
         let tls_username = get_username_from_principal(&subj_alt_name, allowed_client_domains)
             .context("Principal doesnt match realm pattern")?;
-
+        info!("TLS authentication ok for user: {}", tls_username);
         username = Some(tls_username);
     };
 
@@ -147,13 +148,14 @@ fn auth_client(
             }
             AuthType::Pam(pam_name) => {
                 let final_user = do_pam_auth(&mut conn, pam_name)?;
+                info!("Pam authentication ok for user: {}", final_user);
                 username = Some(final_user);
             }
         }
     }
 
     let username = username.context("No username")?;
-    info!("Authenticated user: {:?}", username);
+    info!("Authenticated user: {:?} from {:?}", username, addr);
     Ok((tls_conn, username, client_version))
 }
 
@@ -276,7 +278,7 @@ pub fn connect_user(
         error!("Connection error: {:?}", err);
     }
 
-    info!("User deconnected: {:?}", username);
+    info!("User disconnected: {:?}", username);
     remove_file(socket_path).context("Error in remove_file")?;
 
     Ok(())
@@ -311,7 +313,7 @@ fn auth_and_connect(config: &Config, mut sock: std::net::TcpStream, addr: Socket
         unsafe { libc::exit(1) };
     }
 
-    let (tls_conn, username, client_version) = match auth_client(config, &mut sock) {
+    let (tls_conn, username, client_version) = match auth_client(config, &mut sock, &addr) {
         Ok((tls_conn, username, client_version)) => (tls_conn, username, client_version),
         Err(err) => {
             error!("Error in client auth {:?}", err);
