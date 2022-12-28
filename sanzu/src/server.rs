@@ -405,10 +405,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
                         video_encoder = video_encoder
                             .change_resolution(width, height)
                             .context("Cannot change codec resolution")?;
-                        let msg = tunnel::EventDisplay {
-                            width: width as u32,
-                            height: height as u32,
-                        };
+                        let msg = tunnel::EventDisplay { width, height };
                         let msg = tunnel::MessageSrv {
                             msg: Some(tunnel::message_srv::Msg::Display(msg)),
                         };

@@ -435,9 +435,9 @@ fn put_frame(client_info: &mut ClientInfo, img: &[u8], width: u32, height: u32) 
         let mut cur_line = 0_usize;
         while lines_rem != 0 {
             let lines_todo = if lines_rem > max_lines {
-                max_lines as usize
+                max_lines
             } else {
-                lines_rem as usize
+                lines_rem
             };
             let cur_img =
                 &img[cur_line * width as usize * 4..(cur_line + lines_todo) * width as usize * 4];
@@ -680,8 +680,8 @@ impl Client for ClientInfo {
                 0x0000,
                 0x0000,
                 0x0000,
-                hot.0 as u16,
-                hot.1 as u16,
+                hot.0,
+                hot.1,
             )
             .context("Error in create_cursor")?
             .check()

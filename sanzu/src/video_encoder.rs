@@ -466,7 +466,7 @@ impl Encoder for EncoderFFmpeg {
                         }
                     }
                     Ordering::Greater => {
-                        for index in 0..height as usize {
+                        for index in 0..height {
                             plane[plane_bpl * index..plane_bpl * index + image_bpl]
                                 .copy_from_slice(
                                     &image[image_bpl * index..image_bpl * index + image_bpl],

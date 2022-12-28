@@ -140,7 +140,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
     let codec_name = get_encoder_category(&arguments.encoder_name)?;
 
     let mut sound_encoder = opus::Encoder::new(
-        SOUND_FREQ as u32,
+        SOUND_FREQ,
         opus::Channels::Mono,
         opus::Application::LowDelay,
     )
@@ -282,7 +282,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
         send_client_msg_type!(&mut server, msg, Clienthellofullscreen)
             .context("Error in send ClientHelloFullscreen")
             .map_err(|err| send_srv_err_event(&mut client, err))?;
-        (width as u16, height as u16)
+        (width, height)
     } else {
         /* recv client hello with audio bool */
         let msg = recv_client_msg_type!(&mut client, Clienthelloresolution)
@@ -302,7 +302,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
         config.ffmpeg_options(None),
         config.ffmpeg_options(Some(arguments.encoder_name.as_str())),
         &config.video.ffmpeg_options_cmd,
-        (screen_size.0 as u16, screen_size.1 as u16),
+        (screen_size.0, screen_size.1),
     )?;
 
     // Do socket control
@@ -382,10 +382,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
                     let height = height & !1;
 
                     video_encoder = video_encoder.change_resolution(width, height)?;
-                    let msg = tunnel::EventDisplay {
-                        width: width as u32,
-                        height: height as u32,
-                    };
+                    let msg = tunnel::EventDisplay { width, height };
                     let msg = tunnel::MessageSrv {
                         msg: Some(tunnel::message_srv::Msg::Display(msg)),
                     };

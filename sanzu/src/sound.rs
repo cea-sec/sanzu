@@ -243,19 +243,7 @@ impl SoundDecoder {
                 break;
             }
 
-            let selected_sample_rate = {
-                if sample_rate_max < TARGET_SAMPLE_RATE {
-                    // Select output max quality of the sink (which is less than TARGET_SAMPLE_RATE)
-                    sample_rate_max
-                } else if sample_rate_min > TARGET_SAMPLE_RATE {
-                    // Select output min quality (which is bigger than TARGET_SAMPLE_RATE)
-                    sample_rate_min
-                } else {
-                    // Select TARGET_SAMPLE_RATE
-                    TARGET_SAMPLE_RATE
-                }
-            };
-
+            let selected_sample_rate = TARGET_SAMPLE_RATE.clamp(sample_rate_min, sample_rate_max);
             selected_config = Some(config.with_sample_rate(SampleRate(selected_sample_rate)));
             break;
         }
@@ -440,7 +428,7 @@ impl SoundEncoder {
             true => None,
             false => Some(
                 opus::Encoder::new(
-                    SOUND_FREQ as u32,
+                    SOUND_FREQ,
                     opus::Channels::Mono,
                     opus::Application::LowDelay,
                 )
