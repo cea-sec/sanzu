@@ -300,7 +300,7 @@ fn decode(
                             y_lane as usize,
                             uv_lane as usize,
                             data_rgba_ptr,
-                            (img_out_width as usize * 4) as usize,
+                            img_out_width as usize * 4,
                             yuv_rgb_rs::YuvType::ItuT871,
                         );
                     } else {
@@ -312,7 +312,7 @@ fn decode(
                             y_lane as usize,
                             uv_lane as usize,
                             data_rgba_ptr,
-                            (img_out_width as usize * 4) as usize,
+                            img_out_width as usize * 4,
                             yuv_rgb_rs::YuvType::ItuT871,
                         );
                     }

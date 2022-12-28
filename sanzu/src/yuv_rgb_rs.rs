@@ -138,10 +138,10 @@ pub fn rgb24_yuv420_std(
         for _ in (0..width - 1).step_by(2) {
             // compute yuv for the four pixels, u and v values are summed
 
-            let mut y_tmp = ((param.r_factor as u16 * buffer_rgb[rgb_index1] as u16
+            let mut y_tmp = (param.r_factor as u16 * buffer_rgb[rgb_index1] as u16
                 + param.g_factor as u16 * buffer_rgb[rgb_index1 + 1] as u16
                 + param.b_factor as u16 * buffer_rgb[rgb_index1 + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let mut u_tmp: u16 = buffer_rgb[rgb_index1 + 2] as u16 - y_tmp;
             let mut v_tmp: u16 = buffer_rgb[rgb_index1] as u16 - y_tmp;
             buffer_y[y_index1] =
@@ -214,10 +214,10 @@ pub fn rgba_to_yuv420_std(
 
         for _ in (0..width - 1).step_by(2) {
             // compute yuv for the four pixels, u and v values are summed
-            let mut y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
+            let mut y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
                 + param.g_factor as u16 * buffer_rgba[rgba_index1 + 1] as u16
                 + param.b_factor as u16 * buffer_rgba[rgba_index1 + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let mut u_tmp = buffer_rgba[rgba_index1 + 2] as u16 - y_tmp;
             let mut v_tmp = buffer_rgba[rgba_index1] as u16 - y_tmp;
             buffer_y[y_index1] =
@@ -287,10 +287,10 @@ pub fn rgba_to_yuv444_std(
         let mut v_index = y * v_stride;
         for _ in 0..width {
             // compute yuv for the four pixels, u and v values are summed
-            let y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index] as u16
+            let y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index] as u16
                 + param.g_factor as u16 * buffer_rgba[rgba_index + 1] as u16
                 + param.b_factor as u16 * buffer_rgba[rgba_index + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let u_tmp = buffer_rgba[rgba_index + 2] as u16 - y_tmp;
             let v_tmp = buffer_rgba[rgba_index] as u16 - y_tmp;
             buffer_y[y_index1] =
@@ -806,10 +806,10 @@ pub fn rgba_to_yuv420_ssse3(
         let cur_width = (width / 32) * 32;
         for _ in (cur_width..width - 1).step_by(2) {
             // compute yuv for the four pixels, u and v values are summed
-            let mut y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
+            let mut y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
                 + param.g_factor as u16 * buffer_rgba[rgba_index1 + 1] as u16
                 + param.b_factor as u16 * buffer_rgba[rgba_index1 + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let mut u_tmp = buffer_rgba[rgba_index1 + 2] as u16 - y_tmp;
             let mut v_tmp = buffer_rgba[rgba_index1] as u16 - y_tmp;
             buffer_y[y_index1] =
@@ -1084,10 +1084,10 @@ pub fn rgba_to_yuv444_ssse3(
         let cur_width = (width / 32) * 32;
         for _ in cur_width..width {
             // line 1
-            let y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
+            let y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
                 + param.g_factor as u16 * buffer_rgba[rgba_index1 + 1] as u16
                 + param.b_factor as u16 * buffer_rgba[rgba_index1 + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let u_tmp = buffer_rgba[rgba_index1 + 2] as u16 - y_tmp;
             let v_tmp = buffer_rgba[rgba_index1] as u16 - y_tmp;
             buffer_y[y_index1] =
@@ -1097,10 +1097,10 @@ pub fn rgba_to_yuv444_ssse3(
             buffer_v[v_index1] = (((v_tmp * param.cb_factor as u16) >> 8) + 128) as u8;
 
             // line 1
-            let y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index2] as u16
+            let y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index2] as u16
                 + param.g_factor as u16 * buffer_rgba[rgba_index2 + 1] as u16
                 + param.b_factor as u16 * buffer_rgba[rgba_index2 + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let u_tmp = buffer_rgba[rgba_index2 + 2] as u16 - y_tmp;
             let v_tmp = buffer_rgba[rgba_index2] as u16 - y_tmp;
             buffer_y[y_index2] =
@@ -2365,10 +2365,10 @@ pub fn rgba_to_nv12_std(
         let mut uv_index = (y / 2) * uv_stride;
         for _ in (0..width - 1).step_by(2) {
             // compute yuv for the four pixels, u and v values are summed
-            let mut y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
+            let mut y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
                 + param.g_factor as u16 * buffer_rgba[rgba_index1 + 1] as u16
                 + param.b_factor as u16 * buffer_rgba[rgba_index1 + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let mut u_tmp = buffer_rgba[rgba_index1 + 2] as u16 - y_tmp;
             let mut v_tmp = buffer_rgba[rgba_index1] as u16 - y_tmp;
             buffer_y[y_index1] =
@@ -2609,10 +2609,10 @@ pub fn rgba_to_nv12_ssse3(
         // Complete image width
         let cur_width = (width / 32) * 32;
         for _ in (cur_width..width - 1).step_by(2) {
-            let mut y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
+            let mut y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
                 + param.g_factor as u16 * buffer_rgba[rgba_index1 + 1] as u16
                 + param.b_factor as u16 * buffer_rgba[rgba_index1 + 2] as u16)
-                >> 8) as u16;
+                >> 8;
             let mut u_tmp = buffer_rgba[rgba_index1 + 2] as u16 - y_tmp;
             let mut v_tmp = buffer_rgba[rgba_index1] as u16 - y_tmp;
             buffer_y[y_index1] =
@@ -3054,10 +3054,10 @@ pub fn rgba_to_yuv420_std_rayon(
 
             for _ in (0..width - 1).step_by(2) {
                 // compute yuv for the four pixels, u and v values are summed
-                let mut y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
+                let mut y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index1] as u16
                     + param.g_factor as u16 * buffer_rgba[rgba_index1 + 1] as u16
                     + param.b_factor as u16 * buffer_rgba[rgba_index1 + 2] as u16)
-                    >> 8) as u16;
+                    >> 8;
                 let mut u_tmp = buffer_rgba[rgba_index1 + 2] as u16 - y_tmp;
                 let mut v_tmp = buffer_rgba[rgba_index1] as u16 - y_tmp;
                 cur_y_slice_1[y_index1] =
@@ -3158,10 +3158,10 @@ pub fn rgba_to_yuv444_std_rayon(
             let mut v_index = 0;
             for _ in 0..width {
                 // compute yuv for the four pixels, u and v values are summed
-                let y_tmp = ((param.r_factor as u16 * buffer_rgba[rgba_index] as u16
+                let y_tmp = (param.r_factor as u16 * buffer_rgba[rgba_index] as u16
                     + param.g_factor as u16 * buffer_rgba[rgba_index + 1] as u16
                     + param.b_factor as u16 * buffer_rgba[rgba_index + 2] as u16)
-                    >> 8) as u16;
+                    >> 8;
                 let u_tmp = buffer_rgba[rgba_index + 2] as u16 - y_tmp;
                 let v_tmp = buffer_rgba[rgba_index] as u16 - y_tmp;
                 cur_y_slice[y_index1] =
