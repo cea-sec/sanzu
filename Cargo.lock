@@ -473,6 +473,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "core-foundation"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "194a7a9e6de53fa55116934067c844d9d749312f75c6f6d0980e8c252f8c2146"
+dependencies = [
+ "core-foundation-sys",
+ "libc",
+]
+
+[[package]]
 name = "core-foundation-sys"
 version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1153,6 +1163,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "io-kit-sys"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7789f7f3c9686f96164f5109d69152de759e76e284f736bd57661c6df5091919"
+dependencies = [
+ "core-foundation-sys",
+ "mach",
+]
+
+[[package]]
 name = "io-lifetimes"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1318,9 +1338,12 @@ dependencies = [
 
 [[package]]
 name = "lock_keys"
-version = "1.0.0"
-source = "git+https://github.com/risoflora/lock_keys?rev=9b038ae641264a196845fcf9378ee4c2fa3aa8f0#9b038ae641264a196845fcf9378ee4c2fa3aa8f0"
+version = "1.1.0"
+source = "git+https://github.com/risoflora/lock_keys?rev=38d97697c054d56e40c3975c0add04c33a05e4f4#38d97697c054d56e40c3975c0add04c33a05e4f4"
 dependencies = [
+ "core-foundation",
+ "io-kit-sys",
+ "mach",
  "winapi",
 ]
 
@@ -1561,9 +1584,9 @@ dependencies = [
 
 [[package]]
 name = "notify-rust"
-version = "4.6.0"
+version = "4.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5cc2e370356160e41aba3fd0fbac26d86a89ddd2ac4300c03de999a77cfa2509"
+checksum = "3ce656bb6d22a93ae276a23de52d1aec5ba4db3ece3c0eb79dfd5add7384db6a"
 dependencies = [
  "image",
  "lazy_static",
@@ -1571,8 +1594,6 @@ dependencies = [
  "serde",
  "tauri-winrt-notification",
  "zbus",
- "zvariant",
- "zvariant_derive",
 ]
 
 [[package]]
