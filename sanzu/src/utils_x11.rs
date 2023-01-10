@@ -165,6 +165,7 @@ pub fn delete_video_mode_by_name<C: Connection>(
     }
     Ok(None)
 }
+
 /// Add video mode
 /// Size: (width x height)
 /// If we cannot add video mode, clearn the state by removing the dummy mode by name
@@ -176,6 +177,7 @@ pub fn add_video_mode<C: Connection>(
     name: &str,
     id: usize,
 ) -> Result<u32> {
+    info!("Add_video_mode {}x{} {:?} {}", width, height, name, id);
     let id = id as u32 + 300;
     // Only width / height seems to be used, default other values
     let mode = randr::ModeInfo {
@@ -196,55 +198,147 @@ pub fn add_video_mode<C: Connection>(
 
     let name_bytes: Vec<u8> = name.as_bytes().to_owned();
 
-    trace!("Create video mode {:?} ({:?}) {:?}", mode, id, name);
-    if let Ok(reply) = randr::create_mode(conn, window, mode, &name_bytes)
+    info!("Create video mode {:?} ({:?}) {:?}", mode, id, name);
+    let reply = randr::create_mode(conn, window, mode, &name_bytes)
         .context("Error in create_mode")?
         .reply()
-    {
-        Ok(reply.mode)
-    } else {
-        warn!("Cannot create mode {:?} {}x{}", name, width, height);
-        if get_video_mode(conn, window, name)?.is_some() {
-            delete_video_mode_by_name(conn, window, name)
-                .context("Error in delete_video_mode_by_name")?;
-        }
-        Err(anyhow!("Cannot create video mode"))
-    }
-}
+        .context("Error in create_mode reply")?;
+    info!("New mode {}", reply.mode);
+    let mode_id = reply.mode;
+    conn.flush().context("Error in x11rb flush")?;
 
-/// Set video mode with id @mode
-pub fn set_video_mode<C: Connection>(conn: &C, window: Window, mode: u32) -> Result<()> {
-    let screen_resources = randr::get_screen_resources(conn, window)
+    info!("Find output");
+    let screen_resources = randr::get_screen_resources_current(conn, window)
         .context("Error in get_screen_resources")?
         .reply()
         .context("Error in get_screen_resources reply")?;
+
+    /* find mode */
+    let screen: String = "screen".to_string();
+    let screen_u8 = screen.as_bytes();
+
+    let mut output_found = None;
+    for crtc in screen_resources.crtcs {
+        let reply = randr::get_crtc_info(conn, crtc, 0).context("Cannot get crtc")?;
+        let crtc_data = reply.reply().context("Cannot get crtc reply")?;
+        info!("crtc: {:?}", crtc_data);
+    }
 
     for output in screen_resources.outputs.iter() {
         let video_output = randr::get_output_info(conn, *output, 0)
             .context("Error in get_output_info")?
             .reply()
             .context("Error in get_output_info reply")?;
-
-        if video_output.crtc != 0 {
-            // Add output mode
-            randr::add_output_mode(conn, *output, mode).context("Error in add_output_mode")?;
-            // set video mode
-            randr::set_crtc_config(
-                conn,
-                video_output.crtc,
-                0,
-                0,
-                0,
-                0,
-                mode,
-                randr::Rotation::ROTATE0,
-                &[*output],
-            )
-            .context("Error in set_crtc_config")?
-            .reply()
-            .context("Error in set_crtc_config check")?;
+        if video_output.name == screen_u8 {
+            info!("screen name match: {:?}", *output);
+            output_found = Some(*output);
+            continue;
         }
     }
+    let output_mode = output_found.context("Cannot find output!")?;
+
+    info!("Add video mode {:?}", mode_id);
+    randr::add_output_mode(conn, output_mode, mode_id).context("Error in add_output_mode")?;
+
+    // Set video mode
+    set_video_mode(conn, window, mode_id).context("Error inset_video_mode")?;
+    info!("Set video mode ok");
+    conn.flush().context("Error in x11rb flush")?;
+
+    info!("Set screen size");
+    randr::set_screen_size(conn, window, width, height, width as u32, height as u32)
+        .expect("cannot set screen size");
+
+    Ok(mode_id)
+}
+
+/// Set video mode with id @mode
+pub fn set_video_mode<C: Connection>(conn: &C, window: Window, mode: u32) -> Result<()> {
+    info!("Screen new connection");
+    info!("Set_video_mode {}", mode);
+    let screen_resources = randr::get_screen_resources_current(conn, window)
+        .context("Error in get_screen_resources")?
+        .reply()
+        .context("Error in get_screen_resources reply")?;
+
+    /* find mode */
+    let mut mode_found = None;
+    for mode_info in screen_resources.modes.iter() {
+        info!(
+            "Mode {}x{} {}",
+            mode_info.width, mode_info.height, mode_info.id
+        );
+        if mode_info.id == mode {
+            info!(
+                "Found mode {}x{} {}",
+                mode_info.width, mode_info.height, mode_info.id
+            );
+            mode_found = Some((mode_info.width, mode_info.height));
+        }
+    }
+    let (width, height) = mode_found.expect("No matching mode");
+
+    info!("Loop outputs");
+    let mut infos = None;
+    for output in screen_resources.outputs.iter() {
+        info!("output: {:?}", output);
+        let video_output = randr::get_output_info(conn, *output, 0)
+            .context("Error in get_output_info")?
+            .reply()
+            .context("Error in get_output_info reply")?;
+        info!("output info: {:?}", video_output);
+
+        if video_output.crtc != 0 {
+            infos = Some((video_output.crtc, *output));
+        }
+    }
+
+    if let Some((crtc, output)) = infos {
+        info!("Add_output_mode...");
+        randr::add_output_mode(conn, output, mode).context("Error in add_output_mode")?;
+        info!("ok");
+        conn.flush().context("Error in x11rb flush")?;
+
+        // Set video mode
+        info!("set_crtc_config none");
+        let ret = randr::set_crtc_config(conn, crtc, 0, 0, 0, 0, 0, randr::Rotation::ROTATE0, &[]);
+        info!("Set crtc none");
+        let resp = ret.expect("Error in set_crtc_config");
+        info!("resp");
+        let reply = resp.reply();
+        info!("reply {:?}", reply);
+        reply.expect("Error in set_crtc_config check");
+        info!("Set screen size");
+        randr::set_screen_size(conn, window, width, height, width as u32, height as u32)
+            .expect("cannot set screen size");
+
+        info!(
+            "set_crtc_config crtc: {} mode: {} output: {}",
+            crtc, mode, output
+        );
+        let ret = randr::set_crtc_config(
+            conn,
+            crtc,
+            0,
+            0,
+            0,
+            0,
+            mode,
+            randr::Rotation::ROTATE0,
+            &[output],
+        );
+
+        info!("set_crtc_config ret");
+        let resp = ret.expect("Error in set_crtc_config");
+        info!("resp");
+        let reply = resp.reply();
+        info!("reply {:?}", reply);
+        reply.expect("Error in set_crtc_config check");
+        info!("ok");
+    } else {
+        panic!("Cannot find output mode");
+    }
+
     Ok(())
 }
 

@@ -1623,7 +1623,7 @@ impl Server for ServerX11 {
 
         // Add video mode
         trace!("Add video mode {:?} {}x{}", new_video_name, width, height);
-        let custom_mode = utils_x11::add_video_mode(
+        utils_x11::add_video_mode(
             &self.conn,
             self.window,
             width as u16,
@@ -1632,16 +1632,6 @@ impl Server for ServerX11 {
             new_video_index,
         )
         .context("Error in add_video_mode")?;
-
-        // Set video mode
-        utils_x11::set_video_mode(&self.conn, self.window, custom_mode).map_err(|err| {
-            if utils_x11::delete_video_mode_by_name(&self.conn, self.window, new_video_name)
-                .is_err()
-            {
-                warn!("Error in delete_video_mode_by_name");
-            }
-            err.context("Cannot set mode")
-        })?;
 
         // Create new grab info
         let setup = self.conn.setup();
