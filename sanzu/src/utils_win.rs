@@ -11,6 +11,8 @@ pub fn hid_code_to_hardware_keycode(keycode: u32, flags: u32) -> Option<u16> {
 
         (0x47, 2) | (0x47, 3) => Some(0x006e), // home
 
+        (0x35, 2) | (0x35, 3) => Some(0x006a), // keypad /
+
         (0x48, 0) | (0x48, 1) => Some(0x0050), // keypad 8
         (0x48, 2) | (0x48, 3) => Some(0x006f), // arrow up
 
