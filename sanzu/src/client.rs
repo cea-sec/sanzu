@@ -35,7 +35,22 @@ use crate::{
     video_decoder::init_video_codec,
 };
 
-const SHELL_PATH: &str = "/bin/sh";
+struct ShellAttr {
+    path: &'static str,
+    attr: &'static str,
+}
+
+#[cfg(target_family = "unix")]
+const SHELL_ATTR: ShellAttr = ShellAttr {
+    path: "/bin/sh",
+    attr: "-c",
+};
+
+#[cfg(target_family = "windows")]
+const SHELL_ATTR: ShellAttr = ShellAttr {
+    path: "cmd",
+    attr: "/C",
+};
 
 struct StreamPipes {
     pipe_in: ChildStdout,
@@ -198,8 +213,8 @@ pub fn do_run(
         }
         Some(commandline) => {
             /* Launch proxy command*/
-            let mut child = Command::new(SHELL_PATH)
-                .arg("-c")
+            let mut child = Command::new(SHELL_ATTR.path)
+                .arg(SHELL_ATTR.attr)
                 .arg(commandline)
                 .stdout(Stdio::piped())
                 .stdin(Stdio::piped())
