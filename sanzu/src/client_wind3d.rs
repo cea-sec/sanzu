@@ -45,13 +45,14 @@ use winapi::{
     },
     um::{
         libloaderapi::{GetModuleHandleA, GetProcAddress, LoadLibraryA},
+        processthreadsapi::ExitProcess,
         shellapi::ShellExecuteA,
         wingdi::{CombineRgn, ExtCreateRegion},
         wingdi::{DeleteObject, RDH_RECTANGLES, RGNDATA, RGNDATAHEADER, RGN_OR},
         winuser::{
             CreateWindowExA, DefWindowProcA, DestroyWindow, DispatchMessageA, GetClientRect,
             GetCursorPos, GetRawInputData, GetSystemMetrics, LoadCursorFromFileA, LoadImageA,
-            PeekMessageA, RegisterClassExA, RegisterRawInputDevices, SendMessageA,
+            PeekMessageA, PostQuitMessage, RegisterClassExA, RegisterRawInputDevices, SendMessageA,
             SetClipboardViewer, SetCursor, SetFocus, SetWindowRgn, SetWindowsHookExA,
             TranslateMessage, ICON_BIG, IMAGE_ICON, LR_DEFAULTSIZE, LR_LOADFROMFILE, MSG,
             PM_REMOVE, PRAWINPUT, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_NOLEGACY,
@@ -867,6 +868,10 @@ extern "system" fn custom_wnd_proc(
                 .send(msg_event)
                 .expect("Error in send EventDisplay");
         }
+        WM_DESTROY => {
+            unsafe { PostQuitMessage(0) };
+            return 0;
+        }
         _ => {
             trace!("msg: {:?}, {:?}", hwnd, msg);
         }
@@ -1229,7 +1234,8 @@ pub fn init_wind3d(
         });
 
         let mut msg = MSG::default();
-        while msg.message != WM_QUIT {
+        let mut stopped = false;
+        while msg.message != WM_QUIT && !stopped {
             // Set focus if we activate a sub window
             if msg_receiver.try_recv().is_ok() {
                 unsafe {
@@ -1296,11 +1302,17 @@ pub fn init_wind3d(
             }
 
             while unsafe { PeekMessageA(&mut msg as *mut _, null_mut(), 0, 0, PM_REMOVE) } != 0 {
+                if msg.message == WM_QUIT {
+                    stopped = true;
+                    break;
+                }
                 unsafe { TranslateMessage(&msg) };
                 unsafe { DispatchMessageA(&msg) };
             }
             sleep(Duration::from_millis(5));
         }
+        info!("Client end");
+        unsafe { ExitProcess(0) };
     });
     Ok(Box::new(client_info))
 }
