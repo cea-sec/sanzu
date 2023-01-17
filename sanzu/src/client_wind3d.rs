@@ -118,7 +118,7 @@ fn key_state_to_bool(state: lock_keys::LockKeyState) -> bool {
     }
 }
 
-pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
+pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) -> Result<()> {
     let rect_bound = RECT {
         left: 10000,
         top: 10000,
@@ -139,7 +139,7 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
     let total_size = std::mem::size_of::<RGNDATAHEADER>() + 1;
     let hwnd_rgn = unsafe { ExtCreateRegion(null_mut(), total_size as u32, &rgn) };
     if hwnd_rgn.is_null() {
-        panic!("Cannot create Region");
+        return Err(anyhow!("Cannot create Region"));
     }
     // XXX TODO: get windows window border thickness or set it to 0
     let border_size = 3;
@@ -200,7 +200,7 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
         let new_rgn = unsafe { ExtCreateRegion(null_mut(), total_size as u32, ptr_src_raw) };
 
         if new_rgn.is_null() {
-            panic!("Cannot create Region");
+            return Err(anyhow!("Cannot create Region"));
         }
         // Use drop to keep lifetime of original object through unsafe call
         drop(data);
@@ -215,8 +215,10 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
 
     let ret = unsafe { SetWindowRgn(hwnd as HWND, hwnd_rgn, 0) };
     if ret == 0 {
-        panic!("Cannot set Region");
+        return Err(anyhow!("Cannot  SetWindowRgn"));
     }
+
+    Ok(())
 }
 
 pub struct ClientWindows {
@@ -321,15 +323,12 @@ impl Drop for SanzuDirect3D {
 ///
 /// Initialise Direct3D by calling unsafe Windows API
 unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D> {
-    let p_d3d = Direct3DCreate9(D3D_SDK_VERSION);
-    if p_d3d.is_null() {
+    let p_direct3d = Direct3DCreate9(D3D_SDK_VERSION);
+    if p_direct3d.is_null() {
         return Err(anyhow!("Direct3DCreate9 returned null"));
     }
 
-    let direct3d = p_d3d;
-
-    let mut screen_size = SCREEN_SIZE.lock().unwrap();
-    *screen_size = (width, height);
+    *SCREEN_SIZE.lock().unwrap() = (width, height);
 
     let mut d3dpp = D3DPRESENT_PARAMETERS {
         BackBufferWidth: 0,
@@ -349,18 +348,17 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
     };
 
     let mut p_direct3d_device: *mut IDirect3DDevice9 = null_mut();
-    let direct3d_ref = direct3d.as_ref().context("Null direct3d")?;
+    let direct3d_ref = p_direct3d.as_ref().context("Null direct3d")?;
 
-    let ret = direct3d_ref.CreateDevice(
+    if direct3d_ref.CreateDevice(
         D3DADAPTER_DEFAULT,
         D3DDEVTYPE_HAL,
         hwnd,
         D3DCREATE_SOFTWARE_VERTEXPROCESSING,
         &mut d3dpp as *mut _,
         &mut p_direct3d_device as *mut _,
-    );
-
-    if ret < 0 {
+    ) < 0
+    {
         direct3d_ref.Release();
         return Err(anyhow!("Cannot create d3d device"));
     }
@@ -368,22 +366,22 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
     let device = p_direct3d_device.as_ref().context("Null direct3ddevice")?;
 
     let mut p_direct3d_surface: *mut IDirect3DSurface9 = null_mut();
-    let lret = device.CreateOffscreenPlainSurface(
+    if device.CreateOffscreenPlainSurface(
         width,
         height,
         D3DFMT_X8R8G8B8,
         D3DPOOL_DEFAULT,
         &mut p_direct3d_surface as *mut _,
         null_mut(),
-    );
-    if lret == -1 {
+    ) != 0
+    {
         device.Release();
         direct3d_ref.Release();
         return Err(anyhow!("Error in CreateOffscreenPlainSurface"));
     }
 
     let sanzu_direct3d = SanzuDirect3D {
-        direct3d,
+        direct3d: p_direct3d,
         device: p_direct3d_device,
         surface: p_direct3d_surface,
     };
@@ -441,26 +439,24 @@ unsafe fn render(
         return Err(anyhow!("Error in UnlockRect {:?}", ret));
     }
 
-    let ret = device.Clear(
+    if device.Clear(
         0,
         null_mut(),
         D3DCLEAR_TARGET,
         D3DCOLOR_XRGB(0, 0, 0),
         1.0,
         0,
-    );
-    if ret != 0 {
+    ) != 0
+    {
         return Err(anyhow!("Error in Clear: {:?}", ret));
     }
 
-    let ret = device.BeginScene();
-    if ret != 0 {
+    if device.BeginScene() != 0 {
         return Err(anyhow!("Error in BeginScene: {:?}", ret));
     }
 
     let mut p_back_buffer: *mut IDirect3DSurface9 = null_mut();
-    let ret = device.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _);
-    if ret != 0 {
+    if device.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _) != 0 {
         return Err(anyhow!("Error in getbackbuffer: {:?}", ret));
     }
 
@@ -472,24 +468,22 @@ unsafe fn render(
         bottom: height as i32,
     };
 
-    let ret = device.StretchRect(
+    if device.StretchRect(
         sanzu_direct3d.surface as *mut _,
         null_mut(),
         p_back_buffer,
         &new_rect as *const _,
         D3DTEXF_NONE,
-    );
-    if ret != 0 {
+    ) != 0
+    {
         return Err(anyhow!("Error in StretchRect: {:?}", ret));
     }
 
-    let ret = device.EndScene();
-    if ret != 0 {
+    if device.EndScene() != 0 {
         return Err(anyhow!("Error in EndScene: {:?}", ret));
     }
 
-    let ret = device.Present(null_mut(), null_mut(), null_mut(), null_mut());
-    if ret != 0 {
+    if device.Present(null_mut(), null_mut(), null_mut(), null_mut()) != 0 {
         return Err(anyhow!("Error in Present: {:?}", ret));
     }
     (*p_back_buffer).Release();
@@ -1067,20 +1061,15 @@ pub fn init_wind3d(
         hwndTarget: null_mut(),
     };
 
-    // let p_d3d = unsafe { Direct3DCreate9(D3D_SDK_VERSION) };
-    // if p_d3d.is_null() {
-    //     return Err(anyhow!("Direct3DCreate9 returned null"));
-    // }
-
-    //P_DIRECT3D.store(p_d3d, atomic::Ordering::Release);
-
     unsafe {
-        let ret = RegisterRawInputDevices(
+        if RegisterRawInputDevices(
             &mut x as *mut _,
             1,
             std::mem::size_of::<RAWINPUTDEVICE>() as u32,
-        );
-        assert!(ret == 1);
+        ) == 0
+        {
+            return Err(anyhow!("Error in RegisterRawInputDevices"));
+        }
     };
 
     let (window_sender, window_receiver) = channel();
@@ -1104,8 +1093,7 @@ pub fn init_wind3d(
             ..Default::default()
         };
 
-        let ret = unsafe { RegisterClassExA(&wc) };
-        if ret == 0 {
+        if unsafe { RegisterClassExA(&wc) } == 0 {
             panic!("Cannot register class");
         }
 
@@ -1198,8 +1186,7 @@ pub fn init_wind3d(
             ..Default::default()
         };
 
-        let ret = unsafe { RegisterClassExA(&wc) };
-        if ret == 0 {
+        if unsafe { RegisterClassExA(&wc) } == 0 {
             panic!("Cannot register class");
         }
 
@@ -1225,7 +1212,7 @@ pub fn init_wind3d(
                             }
                         }
                     }
-                    let ret = {
+                    let result = {
                         if let Some(sanzu_direct3d) = sanzu_direct3d.as_mut() {
                             unsafe { render(sanzu_direct3d, data, width, height) }
                         } else {
@@ -1233,7 +1220,7 @@ pub fn init_wind3d(
                         }
                     };
 
-                    if let Err(err) = ret {
+                    if let Err(err) = result {
                         error!("Error during render: {:?}", err);
                         info!("re-Init d3d for resolution {}x{}", width, height);
                         let window = WINHANDLE.load(atomic::Ordering::Acquire);
@@ -1259,7 +1246,11 @@ pub fn init_wind3d(
                 if let Ok(areas) = shape_receiver.recv() {
                     if seamless {
                         trace!("receive shape {:?}", areas);
-                        set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+                        if let Err(err) =
+                            set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas)
+                        {
+                            error!("Error in set_region_clipping: {:?}", err);
+                        }
                     }
                 }
             }
