@@ -14,7 +14,7 @@ cc = "1.0"
 [dependencies]
 anyhow = "1.0"
 byteorder = "1.4"
-clap = "4.0"
+clap = "4.1"
 cpal = "0.14"
 embedded-graphics = "0.7"
 encoding_rs = "0.8"
