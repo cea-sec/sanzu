@@ -97,6 +97,21 @@ fn auth_client(
     Ok((tls_conn, username))
 }
 
+/// Exec main loop
+///
+pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
+    if arguments.endless_loop {
+        loop {
+            if let Err(err) = run_server(config, arguments) {
+                error!("Server error");
+                err.chain().for_each(|cause| error!(" - due to {}", cause));
+            }
+        }
+    } else {
+        run_server(config, arguments)
+    }
+}
+
 /// Server main loop
 ///
 /// The loop is composed of the following actions:
@@ -106,7 +121,7 @@ fn auth_client(
 /// - encode image
 /// - serialize / send events to client
 /// - receive / handle client events
-pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
+pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
     info!("Start server");
 
     let mut sock: Box<dyn ReadWrite> = match (arguments.vsock, arguments.stdio, arguments.unixsock)

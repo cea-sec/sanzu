@@ -36,6 +36,7 @@ pub struct ArgumentsSrv<'a> {
     pub extern_img_source: Option<String>,
     pub avoid_img_extraction: bool,
     pub rdonly: bool,
+    pub endless_loop: bool,
 }
 
 pub struct ArgumentsClient<'a> {
@@ -71,6 +72,7 @@ pub struct ArgumentsProxy<'a> {
     pub audio: bool,
     pub video_shared_mem: Option<String>,
     pub shm_is_xwd: bool,
+    pub endless_loop: bool,
 }
 
 const MAX_HEADER_SIZE: u32 = 0x100;
