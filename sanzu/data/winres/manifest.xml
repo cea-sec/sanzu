@@ -1,11 +1,4 @@
-<!-- example.exe.manifest -->
-<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1" xmlns:asmv3="urn:schemas-microsoft-com:asm.v3">
-  <assemblyIdentity
-      type="win32"
-      name="Sanzu"
-      processorArchitecture="x86"
-      />
   <description>Sanzu</description>
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
