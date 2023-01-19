@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate log;
 
-use clap::{Arg, Command};
+use clap::{Arg, ArgAction, Command};
 use sanzu::{config::read_server_config, proxy, utils::ArgumentsProxy};
 use sanzu_common::proto::VERSION;
 use std::net::IpAddr;
@@ -106,6 +106,13 @@ Protocol version: {:?}
                 .long("shm_is_xwd")
                 .num_args(0),
         )
+        .arg(
+            Arg::new("loop")
+                .help("Endless server clients")
+                .short('d')
+                .long("loop")
+                .action(ArgAction::SetTrue),
+        )
         .get_matches();
 
     let server_addr = matches
@@ -129,6 +136,7 @@ Protocol version: {:?}
     let vsock = matches.get_flag("vsock");
     let import_video_shm = matches.get_one::<String>("import_video_shm").cloned();
     let shm_is_xwd = matches.get_flag("shm_is_xwd");
+    let endless_loop = matches.get_flag("loop");
 
     let arguments = ArgumentsProxy {
         vsock,
@@ -141,6 +149,7 @@ Protocol version: {:?}
         audio,
         video_shared_mem: import_video_shm,
         shm_is_xwd,
+        endless_loop,
     };
 
     if let Err(err) = proxy::run(&conf, &arguments) {

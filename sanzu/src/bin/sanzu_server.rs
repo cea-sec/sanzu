@@ -162,6 +162,13 @@ Protocol version: {:?}
                 .long("rdonly")
                 .action(ArgAction::SetTrue),
         )
+        .arg(
+            Arg::new("loop")
+                .help("Endless server clients")
+                .short('d')
+                .long("loop")
+                .action(ArgAction::SetTrue),
+        )
         .get_matches();
 
     let address = matches.get_one::<String>("listen").unwrap();
@@ -188,6 +195,7 @@ Protocol version: {:?}
     let extern_img_source = matches.get_one::<String>("use_extern_img_source").cloned();
     let avoid_img_extraction = matches.get_flag("avoid_img_extraction");
     let rdonly = matches.get_flag("rdonly");
+    let endless_loop = matches.get_flag("loop");
 
     let arguments = ArgumentsSrv {
         vsock,
@@ -206,6 +214,7 @@ Protocol version: {:?}
         extern_img_source,
         avoid_img_extraction,
         rdonly,
+        endless_loop,
     };
 
     if let Err(err) = server::run(&conf, &arguments) {

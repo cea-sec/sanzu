@@ -136,7 +136,22 @@ macro_rules! send_srv_msg_type {
     }};
 }
 
+/// Exec main loop
+///
 pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
+    if arguments.endless_loop {
+        loop {
+            if let Err(err) = run_server(config, arguments) {
+                error!("Server error");
+                err.chain().for_each(|cause| error!(" - due to {}", cause));
+            }
+        }
+    } else {
+        run_server(config, arguments)
+    }
+}
+
+pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
     let codec_name = get_encoder_category(&arguments.encoder_name)?;
 
     let mut sound_encoder = opus::Encoder::new(
