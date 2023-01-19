@@ -50,9 +50,9 @@ use winapi::{
         wingdi::{CombineRgn, ExtCreateRegion},
         wingdi::{DeleteObject, RDH_RECTANGLES, RGNDATA, RGNDATAHEADER, RGN_OR},
         winuser::{
-            CreateWindowExA, DefWindowProcA, DestroyWindow, DispatchMessageA, GetClientRect,
-            GetCursorPos, GetRawInputData, GetSystemMetrics, LoadCursorFromFileA, LoadImageA,
-            PeekMessageA, PostQuitMessage, RegisterClassExA, RegisterRawInputDevices, SendMessageA,
+            CreateWindowExA, DefWindowProcA, DestroyWindow, DispatchMessageA, GetCursorPos,
+            GetRawInputData, GetSystemMetrics, LoadCursorFromFileA, LoadImageA, PeekMessageA,
+            PostQuitMessage, RegisterClassExA, RegisterRawInputDevices, SendMessageA,
             SetClipboardViewer, SetCursor, SetFocus, SetWindowRgn, SetWindowsHookExA,
             TranslateMessage, ICON_BIG, IMAGE_ICON, LR_DEFAULTSIZE, LR_LOADFROMFILE, MSG,
             PM_REMOVE, PRAWINPUT, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_NOLEGACY,
@@ -70,22 +70,12 @@ type FrameReceiver = Receiver<(Vec<u8>, u32, u32)>;
 type CursorReceiver = Receiver<(Vec<u8>, u32, u32, i32, i32)>;
 
 lazy_static! {
-    static ref P_DIRECT3D: atomic::AtomicPtr<IDirect3D9> = atomic::AtomicPtr::new(null_mut());
-    static ref P_DIRECT3D_DEVICE: atomic::AtomicPtr<IDirect3DDevice9> =
-        atomic::AtomicPtr::new(null_mut());
-    static ref P_DIRECT3D_SURFACE: atomic::AtomicPtr<IDirect3DSurface9> =
-        atomic::AtomicPtr::new(null_mut());
     static ref WINHANDLE: atomic::AtomicPtr<HWND__> = atomic::AtomicPtr::new(null_mut());
     static ref WIN_ID_TO_HANDLE: Mutex<HashMap<usize, u64>> = Mutex::new(HashMap::new());
     static ref HANDLE_TO_WIN_ID: Mutex<HashMap<u64, usize>> = Mutex::new(HashMap::new());
     static ref SCREEN_SIZE: Mutex<(u32, u32)> = Mutex::new((0, 0));
-    static ref RECT_VIEWPORT: Mutex<RECT> = Mutex::new(RECT {
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-    });
     static ref EVENT_SENDER: Mutex<Option<Sender<tunnel::MessageClient>>> = Mutex::new(None);
+    static ref SESSION_SENDER: Mutex<Option<Sender<()>>> = Mutex::new(None);
     static ref CURSOR_RECEIVER: Mutex<Option<CursorReceiver>> = Mutex::new(None);
     static ref SHAPE_RECEIVER: Mutex<Option<Receiver<Vec<Area>>>> = Mutex::new(None);
     static ref KEYS_STATE: Mutex<Vec<bool>> = Mutex::new(vec![false; 0x100]);
@@ -128,7 +118,7 @@ fn key_state_to_bool(state: lock_keys::LockKeyState) -> bool {
     }
 }
 
-pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
+pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) -> Result<()> {
     let rect_bound = RECT {
         left: 10000,
         top: 10000,
@@ -149,7 +139,7 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
     let total_size = std::mem::size_of::<RGNDATAHEADER>() + 1;
     let hwnd_rgn = unsafe { ExtCreateRegion(null_mut(), total_size as u32, &rgn) };
     if hwnd_rgn.is_null() {
-        panic!("Cannot create Region");
+        return Err(anyhow!("Cannot create Region"));
     }
     // XXX TODO: get windows window border thickness or set it to 0
     let border_size = 3;
@@ -210,7 +200,7 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
         let new_rgn = unsafe { ExtCreateRegion(null_mut(), total_size as u32, ptr_src_raw) };
 
         if new_rgn.is_null() {
-            panic!("Cannot create Region");
+            return Err(anyhow!("Cannot create Region"));
         }
         // Use drop to keep lifetime of original object through unsafe call
         drop(data);
@@ -225,8 +215,10 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) {
 
     let ret = unsafe { SetWindowRgn(hwnd as HWND, hwnd_rgn, 0) };
     if ret == 0 {
-        panic!("Cannot set Region");
+        return Err(anyhow!("Cannot  SetWindowRgn"));
     }
+
+    Ok(())
 }
 
 pub struct ClientWindows {
@@ -256,6 +248,7 @@ impl ClientWindows {
         Sender<tunnel::MessageClient>,
         CursorReceiver,
         Receiver<Vec<Area>>,
+        Receiver<()>,
     ) {
         // Frame sender is sync to make backpressure to the serveur if we are slower
         let (frame_sender, frame_receiver) = sync_channel(1);
@@ -263,6 +256,9 @@ impl ClientWindows {
 
         let (cursor_sender, cursor_receiver) = channel();
         let (shape_sender, shape_receiver) = channel();
+
+        let (session_sender, session_receiver) = channel();
+        SESSION_SENDER.lock().unwrap().replace(session_sender);
 
         let (width, height) = match server_size {
             Some((width, height)) => (width, height),
@@ -297,50 +293,42 @@ impl ClientWindows {
             event_sender,
             cursor_receiver,
             shape_receiver,
+            session_receiver,
         )
+    }
+}
+
+/* IDirect3D9 wrapper structure */
+struct SanzuDirect3D {
+    direct3d: *mut IDirect3D9,
+    device: *mut IDirect3DDevice9,
+    surface: *mut IDirect3DSurface9,
+}
+
+impl Drop for SanzuDirect3D {
+    fn drop(&mut self) {
+        if let Some(direct3d) = unsafe { self.direct3d.as_ref() } {
+            unsafe { direct3d.Release() };
+        }
+        if let Some(device) = unsafe { self.device.as_ref() } {
+            unsafe { device.Release() };
+        }
+        if let Some(surface) = unsafe { self.surface.as_ref() } {
+            unsafe { surface.Release() };
+        }
     }
 }
 
 /// # Safety
 ///
 /// Initialise Direct3D by calling unsafe Windows API
-pub unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<()> {
-    /* Release preview device / surface */
-    let g_p_direct3d = P_DIRECT3D.load(atomic::Ordering::Acquire);
-    let g_p_direct3d_device = P_DIRECT3D_DEVICE.load(atomic::Ordering::Acquire);
-    let g_p_direct3d_surface = P_DIRECT3D_SURFACE.load(atomic::Ordering::Acquire);
-    let mut g_rect_viewport = RECT_VIEWPORT.lock().unwrap();
-
-    if let Some(surface) = g_p_direct3d_surface.as_ref() {
-        surface.Release();
-    }
-
-    if let Some(device) = g_p_direct3d_device.as_ref() {
-        device.Release();
-    }
-    P_DIRECT3D_DEVICE.store(null_mut(), atomic::Ordering::Release);
-
-    if let Some(direct3d) = g_p_direct3d.as_ref() {
-        direct3d.Release();
-    }
-    P_DIRECT3D_SURFACE.store(null_mut(), atomic::Ordering::Release);
-
-    let p_d3d = Direct3DCreate9(D3D_SDK_VERSION);
-    if p_d3d.is_null() {
+unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D> {
+    let p_direct3d = Direct3DCreate9(D3D_SDK_VERSION);
+    if p_direct3d.is_null() {
         return Err(anyhow!("Direct3DCreate9 returned null"));
     }
 
-    P_DIRECT3D.store(p_d3d, atomic::Ordering::Release);
-
-    let mut screen_size = SCREEN_SIZE.lock().unwrap();
-    *screen_size = (width, height);
-
-    let mut rect_viewport = RECT {
-        left: 0,
-        top: 0,
-        right: 0,
-        bottom: 0,
-    };
+    *SCREEN_SIZE.lock().unwrap() = (width, height);
 
     let mut d3dpp = D3DPRESENT_PARAMETERS {
         BackBufferWidth: 0,
@@ -359,48 +347,46 @@ pub unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<()> {
         PresentationInterval: 0,
     };
 
-    GetClientRect(hwnd, &mut rect_viewport as *mut _);
-
     let mut p_direct3d_device: *mut IDirect3DDevice9 = null_mut();
-    let ret = P_DIRECT3D
-        .load(atomic::Ordering::Acquire)
-        .as_ref()
-        .context("Null Direct3d obj")?
-        .CreateDevice(
-            D3DADAPTER_DEFAULT,
-            D3DDEVTYPE_HAL,
-            hwnd,
-            D3DCREATE_SOFTWARE_VERTEXPROCESSING,
-            &mut d3dpp as *mut _,
-            &mut p_direct3d_device as *mut _,
-        );
+    let direct3d_ref = p_direct3d.as_ref().context("Null direct3d")?;
 
-    if ret < 0 {
-        trace!("Error in create device");
+    if direct3d_ref.CreateDevice(
+        D3DADAPTER_DEFAULT,
+        D3DDEVTYPE_HAL,
+        hwnd,
+        D3DCREATE_SOFTWARE_VERTEXPROCESSING,
+        &mut d3dpp as *mut _,
+        &mut p_direct3d_device as *mut _,
+    ) < 0
+    {
+        direct3d_ref.Release();
         return Err(anyhow!("Cannot create d3d device"));
     }
 
+    let device = p_direct3d_device.as_ref().context("Null direct3ddevice")?;
+
     let mut p_direct3d_surface: *mut IDirect3DSurface9 = null_mut();
-    let lret = p_direct3d_device
-        .as_ref()
-        .context("Null device")?
-        .CreateOffscreenPlainSurface(
-            width,
-            height,
-            D3DFMT_X8R8G8B8,
-            D3DPOOL_DEFAULT,
-            &mut p_direct3d_surface as *mut _,
-            null_mut(),
-        );
-    if lret == -1 {
-        panic!("Error in CreateOffscreenPlainSurface");
+    if device.CreateOffscreenPlainSurface(
+        width,
+        height,
+        D3DFMT_X8R8G8B8,
+        D3DPOOL_DEFAULT,
+        &mut p_direct3d_surface as *mut _,
+        null_mut(),
+    ) != 0
+    {
+        device.Release();
+        direct3d_ref.Release();
+        return Err(anyhow!("Error in CreateOffscreenPlainSurface"));
     }
 
-    P_DIRECT3D_DEVICE.store(p_direct3d_device, atomic::Ordering::Release);
-    P_DIRECT3D_SURFACE.store(p_direct3d_surface, atomic::Ordering::Release);
-    *g_rect_viewport = rect_viewport;
+    let sanzu_direct3d = SanzuDirect3D {
+        direct3d: p_direct3d,
+        device: p_direct3d_device,
+        surface: p_direct3d_surface,
+    };
 
-    Ok(())
+    Ok(sanzu_direct3d)
 }
 
 /// Render a frame to the Direct3D context
@@ -408,23 +394,20 @@ pub unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<()> {
 ///
 /// - p_direct3d_device must not be null
 /// - p_direct3d_surface must not be null
-pub unsafe fn render(
+unsafe fn render(
+    sanzu_direct3d: &mut SanzuDirect3D,
     data: Vec<u8>,
     width: u32,
     height: u32,
-    p_direct3d_device: *mut IDirect3DDevice9,
-    p_direct3d_surface: *mut IDirect3DSurface9,
-) -> i32 {
+) -> Result<()> {
     let mut d3d_rect = D3DLOCKED_RECT::default();
-    if p_direct3d_surface.is_null() {
-        trace!("p_direct3d_surface is null");
-        return -1;
-    }
+    let device = sanzu_direct3d.device.as_ref().context("Null device")?;
 
-    let lret =
-        (*p_direct3d_surface).LockRect(&mut d3d_rect as *mut _, null_mut(), D3DLOCK_DONOTWAIT);
-    if lret == -1 {
-        panic!("Error in lockrect {}", lret);
+    let surface = sanzu_direct3d.surface.as_ref().context("Null surface")?;
+
+    let ret = surface.LockRect(&mut d3d_rect as *mut _, null_mut(), D3DLOCK_DONOTWAIT);
+    if ret == -1 {
+        return Err(anyhow!("Error in lockrect {:?}", ret));
     }
 
     let mut p_src = data;
@@ -434,7 +417,12 @@ pub unsafe fn render(
     let pixel_w_size = width * 4;
 
     if p_dest.is_null() {
-        debug!("Null dest");
+        // Unlock locked surface
+        let lret = surface.UnlockRect();
+        if lret == -1 {
+            return Err(anyhow!("Error in unlockrect {}", lret));
+        }
+        return Err(anyhow!("Error: pBits is null"));
     } else {
         for _i in 0..height {
             std::ptr::copy_nonoverlapping(raw_src as *const _, p_dest, pixel_w_size as usize);
@@ -446,27 +434,31 @@ pub unsafe fn render(
     // Use drop to keep lifetime of original object through unsafe call
     drop(p_src);
 
-    let lret = (*p_direct3d_surface).UnlockRect();
-    if lret == -1 {
-        panic!("Error in unlockrect {}", lret);
+    let ret = surface.UnlockRect();
+    if ret == -1 {
+        return Err(anyhow!("Error in UnlockRect {:?}", ret));
     }
 
-    if p_direct3d_device.is_null() {
-        panic!("p_direct3d_device is null");
-    }
-    (*p_direct3d_device).Clear(
+    if device.Clear(
         0,
         null_mut(),
         D3DCLEAR_TARGET,
         D3DCOLOR_XRGB(0, 0, 0),
         1.0,
         0,
-    );
+    ) != 0
+    {
+        return Err(anyhow!("Error in Clear: {:?}", ret));
+    }
 
-    (*p_direct3d_device).BeginScene();
+    if device.BeginScene() != 0 {
+        return Err(anyhow!("Error in BeginScene: {:?}", ret));
+    }
 
     let mut p_back_buffer: *mut IDirect3DSurface9 = null_mut();
-    (*p_direct3d_device).GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _);
+    if device.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _) != 0 {
+        return Err(anyhow!("Error in getbackbuffer: {:?}", ret));
+    }
 
     /* Use rect with img size to avoid stretching */
     let new_rect = RECT {
@@ -476,19 +468,26 @@ pub unsafe fn render(
         bottom: height as i32,
     };
 
-    (*p_direct3d_device).StretchRect(
-        p_direct3d_surface,
+    if device.StretchRect(
+        sanzu_direct3d.surface as *mut _,
         null_mut(),
         p_back_buffer,
         &new_rect as *const _,
         D3DTEXF_NONE,
-    );
+    ) != 0
+    {
+        return Err(anyhow!("Error in StretchRect: {:?}", ret));
+    }
 
-    (*p_direct3d_device).EndScene();
+    if device.EndScene() != 0 {
+        return Err(anyhow!("Error in EndScene: {:?}", ret));
+    }
 
-    let ret = (*p_direct3d_device).Present(null_mut(), null_mut(), null_mut(), null_mut());
+    if device.Present(null_mut(), null_mut(), null_mut(), null_mut()) != 0 {
+        return Err(anyhow!("Error in Present: {:?}", ret));
+    }
     (*p_back_buffer).Release();
-    ret
+    Ok(())
 }
 
 extern "system" fn custom_wnd_proc_sub(
@@ -821,17 +820,10 @@ extern "system" fn custom_wnd_proc(
             info!("clipboard chain");
         }
         WM_WTSSESSION_CHANGE => {
-            debug!("Session change state {:?} {:?}", lparam, wparam);
+            info!("Session change state {:?} {:?}", lparam, wparam);
             if wparam as u32 == WTS_SESSION_UNLOCK {
                 // Force d3d re init
                 let (width, height) = *SCREEN_SIZE.lock().unwrap();
-
-                let window = WINHANDLE.load(atomic::Ordering::Acquire);
-
-                if let Err(_err) = unsafe { init_d3d9(window, width as u32, height as u32) } {
-                    warn!("Init d3d9 err");
-                }
-
                 let msg = tunnel::EventDisplay {
                     width: width as u32,
                     height: height as u32,
@@ -846,6 +838,13 @@ extern "system" fn custom_wnd_proc(
                     .unwrap()
                     .send(msg_event)
                     .expect("Error in send EventDisplay");
+                SESSION_SENDER
+                    .lock()
+                    .unwrap()
+                    .as_ref()
+                    .unwrap()
+                    .send(())
+                    .expect("Cannot send session unlock");
             }
         }
         WM_DISPLAYCHANGE | WM_SIZE => {
@@ -1034,13 +1033,19 @@ pub fn init_wind3d(
     mut seamless: bool,
     server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Client>> {
-    let (client_info, frame_receiver, event_sender, cursor_receiver, shape_receiver) =
-        ClientWindows::build(
-            server_size,
-            argumets.clipboard_config,
-            argumets.printdir.clone(),
-            argumets.sync_key_locks,
-        );
+    let (
+        client_info,
+        frame_receiver,
+        event_sender,
+        cursor_receiver,
+        shape_receiver,
+        session_receiver,
+    ) = ClientWindows::build(
+        server_size,
+        argumets.clipboard_config,
+        argumets.printdir.clone(),
+        argumets.sync_key_locks,
+    );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
     let window_mode = argumets.window_mode;
 
@@ -1056,20 +1061,15 @@ pub fn init_wind3d(
         hwndTarget: null_mut(),
     };
 
-    let p_d3d = unsafe { Direct3DCreate9(D3D_SDK_VERSION) };
-    if p_d3d.is_null() {
-        return Err(anyhow!("Direct3DCreate9 returned null"));
-    }
-
-    P_DIRECT3D.store(p_d3d, atomic::Ordering::Release);
-
     unsafe {
-        let ret = RegisterRawInputDevices(
+        if RegisterRawInputDevices(
             &mut x as *mut _,
             1,
             std::mem::size_of::<RAWINPUTDEVICE>() as u32,
-        );
-        assert!(ret == 1);
+        ) == 0
+        {
+            return Err(anyhow!("Error in RegisterRawInputDevices"));
+        }
     };
 
     let (window_sender, window_receiver) = channel();
@@ -1093,8 +1093,7 @@ pub fn init_wind3d(
             ..Default::default()
         };
 
-        let ret = unsafe { RegisterClassExA(&wc) };
-        if ret == 0 {
+        if unsafe { RegisterClassExA(&wc) } == 0 {
             panic!("Cannot register class");
         }
 
@@ -1187,33 +1186,53 @@ pub fn init_wind3d(
             ..Default::default()
         };
 
-        let ret = unsafe { RegisterClassExA(&wc) };
-        if ret == 0 {
+        if unsafe { RegisterClassExA(&wc) } == 0 {
             panic!("Cannot register class");
         }
 
         // Render thread
         // Only take one image from the queue. As it's a sync channel, this
         // will add a backpressure to the main thread.
-        thread::spawn(move || loop {
-            if let Ok((data, width, height)) = frame_receiver.recv() {
-                if (width, height) != *SCREEN_SIZE.lock().unwrap() {
-                    let window = WINHANDLE.load(atomic::Ordering::Acquire);
-
-                    info!("Init d3d for new  resolution {}x{}", width, height);
-                    if let Err(_err) = unsafe { init_d3d9(window, width as u32, height as u32) } {
-                        warn!("Init d3d9 err");
+        thread::spawn(move || {
+            let mut sanzu_direct3d = None;
+            loop {
+                if let Ok((data, width, height)) = frame_receiver.recv() {
+                    if (width, height) != *SCREEN_SIZE.lock().unwrap()
+                        || session_receiver.try_recv().is_ok()
+                    {
+                        let window = WINHANDLE.load(atomic::Ordering::Acquire);
+                        info!("Init d3d for new resolution {}x{}", width, height);
+                        match unsafe { init_d3d9(window, width as u32, height as u32) } {
+                            Ok(new_sanzu_direct3d) => {
+                                sanzu_direct3d = Some(new_sanzu_direct3d);
+                            }
+                            Err(err) => {
+                                error!("Error in Init_d3d9: {:?}", err);
+                                sanzu_direct3d = None;
+                            }
+                        }
                     }
-                }
-                let ret = {
-                    let p_direct3d_device = P_DIRECT3D_DEVICE.load(atomic::Ordering::Acquire);
-                    let p_direct3d_surface = P_DIRECT3D_SURFACE.load(atomic::Ordering::Acquire);
-                    unsafe { render(data, width, height, p_direct3d_device, p_direct3d_surface) }
-                };
-                if ret < 0 {
-                    let window = WINHANDLE.load(atomic::Ordering::Acquire);
-                    if let Err(_err) = unsafe { init_d3d9(window, width as u32, height as u32) } {
-                        warn!("Init d3d9 err");
+                    let result = {
+                        if let Some(sanzu_direct3d) = sanzu_direct3d.as_mut() {
+                            unsafe { render(sanzu_direct3d, data, width, height) }
+                        } else {
+                            Err(anyhow!("No sanzu obj"))
+                        }
+                    };
+
+                    if let Err(err) = result {
+                        error!("Error during render: {:?}", err);
+                        info!("re-Init d3d for resolution {}x{}", width, height);
+                        let window = WINHANDLE.load(atomic::Ordering::Acquire);
+                        match unsafe { init_d3d9(window, width as u32, height as u32) } {
+                            Ok(new_sanzu_direct3d) => {
+                                sanzu_direct3d = Some(new_sanzu_direct3d);
+                            }
+                            Err(err) => {
+                                warn!("Error in Init_d3d9: {:?}", err);
+                                sanzu_direct3d = None;
+                            }
+                        }
                     }
                 }
             }
@@ -1227,7 +1246,11 @@ pub fn init_wind3d(
                 if let Ok(areas) = shape_receiver.recv() {
                     if seamless {
                         trace!("receive shape {:?}", areas);
-                        set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas);
+                        if let Err(err) =
+                            set_region_clipping(WINHANDLE.load(atomic::Ordering::Acquire), &areas)
+                        {
+                            error!("Error in set_region_clipping: {:?}", err);
+                        }
                     }
                 }
             }
