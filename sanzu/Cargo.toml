@@ -1,6 +1,6 @@
 [package]
 name = "sanzu"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Fabrice Desclaux <fabrice.desclaux@cea.fr>"]
 edition = "2018"
 readme = "README.md"
@@ -10,6 +10,7 @@ license = "GPL-3.0"
 [build-dependencies]
 bindgen = "0.63"
 cc = "1.0"
+winres = {git = "https://github.com/serpilliere/winres", branch="link_resources"}
 
 [dependencies]
 anyhow = "1.0"
@@ -108,6 +109,9 @@ assets = [
     { source = "README.md", dest = "/usr/share/doc/sanzu/README", mode = "0644", doc = true },
 ]
 
+[package.metadata.winres]
+LegalCopyright = "Copyright © 2021-2023"
+FileDescription = "Sanzu video server, proxy and client"
 
 # Compilation for Windows:
 # export PKG_CONFIG_ALLOW_CROSS=1

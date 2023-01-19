@@ -2273,7 +2273,7 @@ dependencies = [
 
 [[package]]
 name = "sanzu"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "anyhow",
  "bindgen 0.63.0",
@@ -2314,6 +2314,7 @@ dependencies = [
  "vsock",
  "webpki-roots",
  "winapi",
+ "winres",
  "x11-clipboard",
  "x11rb 0.11.0",
  "x509-parser",
@@ -3201,6 +3202,14 @@ name = "windows_x86_64_msvc"
 version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f40009d85759725a34da6d89a94e63d7bdc50a862acf0dbc7c8e488f1edcb6f5"
+
+[[package]]
+name = "winres"
+version = "0.1.11"
+source = "git+https://github.com/serpilliere/winres?branch=link_resources#7f4f86eadc2e005b94ac56e210c55e64d217c6ef"
+dependencies = [
+ "toml",
+]
 
 [[package]]
 name = "x11-clipboard"
