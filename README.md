@@ -1,3 +1,5 @@
+[![Build & test](https://github.com/cea-sec/sanzu/actions/workflows/test.yml/badge.svg)](https://github.com/cea-sec/sanzu/actions/workflows/test.yml)
+
 # Sanzu
 
 Sanzu is a graphical remote desktop solution. It is composed of:
