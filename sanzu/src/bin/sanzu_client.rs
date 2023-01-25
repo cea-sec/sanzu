@@ -14,6 +14,9 @@ use sanzu_common::proto::VERSION;
 
 use std::collections::HashMap;
 
+#[cfg(windows)]
+use winapi::um::wincon;
+
 fn main() {
     env_logger::Builder::from_default_env()
         .format_timestamp_nanos()
@@ -30,6 +33,13 @@ RUST_LOG=info
 "#,
         VERSION
     );
+
+    #[cfg(windows)]
+    {
+        unsafe {
+            wincon::AttachConsole(wincon::ATTACH_PARENT_PROCESS);
+        }
+    }
 
     let app = Command::new("Sanzu client")
         .version("0.1.0")
