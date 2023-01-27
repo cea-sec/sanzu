@@ -618,6 +618,7 @@ extern "system" fn custom_wnd_proc(
                 let key_code = utils_win::hid_code_to_hardware_keycode(
                     data.MakeCode as u32,
                     data.Flags as u32,
+                    data.VKey as u32,
                 );
                 let updown = data.Message & 1 == 0;
                 (key_code, updown)

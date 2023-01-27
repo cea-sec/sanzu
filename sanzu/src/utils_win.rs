@@ -1,5 +1,16 @@
 /* We want hardware keycode! */
-pub fn hid_code_to_hardware_keycode(keycode: u32, flags: u32) -> Option<u16> {
+pub fn hid_code_to_hardware_keycode(keycode: u32, flags: u32, vkey: u32) -> Option<u16> {
+    // Distinguish:
+    // - pause
+    // - ver num
+    if let Some(hw_keycode) = match (keycode, vkey) {
+        (0x45, 0xff) => Some(0x007f), // pause
+        (0x45, 0x90) => Some(0x004d), // ver num
+        (_, _) => None,
+    } {
+        return Some(hw_keycode);
+    }
+
     // Distinguish:
     // alt left / right
     // shift / arrow
@@ -12,6 +23,8 @@ pub fn hid_code_to_hardware_keycode(keycode: u32, flags: u32) -> Option<u16> {
         (0x47, 2) | (0x47, 3) => Some(0x006e), // home
 
         (0x35, 2) | (0x35, 3) => Some(0x006a), // keypad /
+
+        (0x37, 2) | (0x37, 3) => Some(0x006b), // print screen
 
         (0x48, 0) | (0x48, 1) => Some(0x0050), // keypad 8
         (0x48, 2) | (0x48, 3) => Some(0x006f), // arrow up
@@ -44,7 +57,11 @@ pub fn hid_code_to_hardware_keycode(keycode: u32, flags: u32) -> Option<u16> {
         (0x53, 2) | (0x53, 3) => Some(0x0077), // dot keypad
 
         (0x2a, 2) | (0x2a, 3) => {
-            // ignore additional key hit durring arrow
+            // ignore additional key hit during arrow
+            return None;
+        }
+        (0x1d, 4) | (0x1d, 5) => {
+            // ignore additional key hit during pause key
             return None;
         }
         (_, _) => None,
@@ -132,7 +149,7 @@ pub fn hid_code_to_hardware_keycode(keycode: u32, flags: u32) -> Option<u16> {
         0x43 => 0x004B, // F9
         0x44 => 0x004C, // F10
 
-        0x45 => 0x004d, // ver num
+        0x46 => 0x004e, // scroll lock
 
         0x47 => 0x004f, // home / 7
         0x48 => 0x006f, // up / 8
@@ -240,6 +257,7 @@ pub fn hardware_keycode_to_hid_code(hw_keycode: u32) -> Option<(u16, bool)> {
         0x004C => (0x44, false), // F10
 
         0x004d => (0x45, false), // ver num
+        0x004e => (0x46, false), // scroll lock
 
         0x004f => (0x47, false), // home / 7
         0x0052 => (0x4A, false), // minus keypad
