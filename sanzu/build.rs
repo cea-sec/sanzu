@@ -23,8 +23,8 @@ fn main() {
             // MAKELANGID(LANG_ENGLISH, SUBLANG_ENGLISH_US )
             .set_language(0x0409)
             .set_manifest_file("data/winres/manifest.xml");
-        if let Err(e) = res.compile() {
-            eprintln!("{}", e);
+        if let Err(err) = res.compile() {
+            eprintln!("{err}");
             std::process::exit(1);
         }
     }

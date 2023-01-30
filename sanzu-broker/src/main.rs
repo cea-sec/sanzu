@@ -233,7 +233,7 @@ pub fn connect_user(
 ) -> Result<()> {
     // Create socket file
     let uuid = Uuid::new_v4();
-    let socket_path = format!("/tmp/video_{}", uuid);
+    let socket_path = format!("/tmp/video_{uuid}");
     debug!("Bind unix socket {:?}", socket_path);
 
     let on_connect = &config.cmd_callback.on_connect;
@@ -242,7 +242,7 @@ pub fn connect_user(
     let args = replace_source(&args, TOKEN_UNIX_SOCKET_PATH, &socket_path);
 
     let listener = std::os::unix::net::UnixListener::bind(&socket_path)
-        .context(format!("Error in UnixListener bind {:?}", socket_path))?;
+        .context(format!("Error in UnixListener bind {socket_path:?}"))?;
 
     debug!("bin {} args {:?}", on_connect.command_bin, args);
     let status = process::Command::new(&on_connect.command_bin)
@@ -331,7 +331,7 @@ fn auth_and_connect(config: &Config, mut sock: std::net::TcpStream, addr: Socket
 fn serve_user(config: &Config, address: IpAddr, port: u16) -> Result<()> {
     info!("Server loop");
     let listener = std::net::TcpListener::bind(SocketAddr::new(address, port))
-        .context(format!("Error in TcpListener bind {} {}", address, port))?;
+        .context(format!("Error in TcpListener bind {address} {port}"))?;
     loop {
         let (sock, addr) = listener.accept().context("Failed to accept connection")?;
 
@@ -361,9 +361,8 @@ fn main() -> Result<()> {
     let about = format!(
         r#"Sanzu broker
 
-Protocol version: {:?}
-"#,
-        VERSION
+Protocol version: {VERSION:?}
+"#
     );
 
     let matches = Command::new("Surf server")

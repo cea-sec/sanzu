@@ -307,9 +307,8 @@ pub fn init_x11rb(
     let (major, minor) = check_shm_version(&conn).context("Error in check_shm_version")?;
     if major < 1 || (major == 1 && minor < 2) {
         let err = format!(
-            "X11 server supports version {}.{} of the SHM extension, but version 1.2 \
+            "X11 server supports version {major}.{minor} of the SHM extension, but version 1.2 \
              is needed",
-            major, minor,
         );
         return Err(anyhow!(err));
     }

@@ -103,7 +103,7 @@ impl Tunnel {
 pub fn send_server_err_event(sock: &mut dyn ReadWrite, err: anyhow::Error) -> anyhow::Error {
     let mut errors = vec![];
     if let Some(err) = err.chain().next() {
-        errors.push(format!("{}", err));
+        errors.push(format!("{err}"));
     }
 
     let err_msg = tunnel::EventError { errors };
@@ -207,7 +207,7 @@ pub fn recv_server_msg_or_error(
 pub fn send_client_err_event(sock: &mut dyn ReadWrite, err: anyhow::Error) -> anyhow::Error {
     let mut errors = vec![];
     if let Some(err) = err.chain().next() {
-        errors.push(format!("{}", err));
+        errors.push(format!("{err}"));
     }
 
     let err_msg = tunnel::EventError { errors };

@@ -30,7 +30,7 @@ use std::{
 fn send_srv_err_event(sock: &mut Box<dyn ReadWrite>, err: anyhow::Error) -> anyhow::Error {
     let mut errors = vec!["Errors from proxy's server:".to_string()];
     for err in err.chain() {
-        errors.push(format!("    {}", err));
+        errors.push(format!("    {err}"));
     }
 
     let err_msg = tunnel::EventError { errors };
@@ -49,7 +49,7 @@ fn send_srv_err_event(sock: &mut Box<dyn ReadWrite>, err: anyhow::Error) -> anyh
 fn send_client_err_event(sock: &mut Box<dyn ReadWrite>, err: anyhow::Error) -> anyhow::Error {
     let mut errors = vec!["Errors from proxy's client:".to_string()];
     for err in err.chain() {
-        errors.push(format!("    {}", err));
+        errors.push(format!("    {err}"));
     }
 
     let err_msg = tunnel::EventError { errors };
@@ -164,7 +164,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
     let video_shared_mem = match arguments.video_shared_mem.as_deref() {
         Some(shared_mem_file) => {
             let file = fs::File::open(shared_mem_file)
-                .context(format!("Error in open shared mem {:?}", shared_mem_file))?;
+                .context(format!("Error in open shared mem {shared_mem_file:?}"))?;
             unsafe {
                 Some(
                     MmapOptions::new()
@@ -194,7 +194,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
             }
             (None, Some(unix_socket)) => {
                 let client = UnixStream::connect(unix_socket)
-                    .context(format!("Error in connect to unix socket {:?}", unix_socket))?;
+                    .context(format!("Error in connect to unix socket {unix_socket:?}"))?;
                 Box::new(client)
             }
             _ => {
@@ -213,7 +213,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
             .parse::<u32>()
             .expect("Not a vsock address");
         let server = vsock::VsockStream::connect(&vsock::VsockAddr::new(address, port)).context(
-            format!("Error in vsock server connection {:?} {:?}", address, port),
+            format!("Error in vsock server connection {address:?} {port:?}"),
         )?;
         info!("Connected to server");
         Box::new(server)
@@ -224,7 +224,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
             .expect("Cannot parse port");
         let destination = format!("{}:{}", arguments.server_addr, port);
         let server = TcpStream::connect(&destination)
-            .context(format!("Error in tcp server connection {:?}", destination))?;
+            .context(format!("Error in tcp server connection {destination:?}"))?;
         info!("Connected to server");
         server.set_nodelay(true).expect("set_nodelay call failed");
         Box::new(server)
@@ -331,7 +331,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
         info!("Listening on control path {:?}", control_path);
         thread::spawn(move || {
             let pid = std::process::id();
-            let control_path = control_path.replace("%PID%", &format!("{}", pid));
+            let control_path = control_path.replace("%PID%", &format!("{pid}"));
             // Try to remove path first
             let _ = std::fs::remove_file(&control_path);
             let listener = std::os::unix::net::UnixListener::bind(&control_path)
@@ -382,7 +382,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
 
                 Some(tunnel::message_srv::Msg::Stats(msg_stats)) => {
                     if let Some(ref proxy_stats) = time_encode_video {
-                        let stats = msg_stats.stats + &format!(" proxy: {}", proxy_stats);
+                        let stats = msg_stats.stats + &format!(" proxy: {proxy_stats}");
                         trace!("server stats: {:?}", stats);
                         let msg = tunnel::message_srv::Msg::Stats(tunnel::EventStats { stats });
                         let msg = tunnel::MessageSrv { msg: Some(msg) };

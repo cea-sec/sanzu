@@ -117,7 +117,7 @@ pub struct StdioClientInterface {}
 
 impl ClientInterface for StdioClientInterface {
     fn pam_echo(&mut self, echo: String) -> Result<String> {
-        println!("{}", echo);
+        println!("{echo}");
         let mut user = String::new();
         let stdin = std::io::stdin();
         std::io::stdout().flush().unwrap();
@@ -136,12 +136,12 @@ impl ClientInterface for StdioClientInterface {
     }
 
     fn pam_info(&mut self, info: String) -> Result<()> {
-        println!("{}", info);
+        println!("{info}");
         Ok(())
     }
 
     fn pam_error(&mut self, error: String) -> Result<()> {
-        println!("{}", error);
+        println!("{error}");
         Ok(())
     }
 
@@ -207,7 +207,7 @@ pub fn do_run(
         None => {
             let destination = format!("{}:{}", arguments.address, arguments.port);
             let socket = TcpStream::connect(&destination)
-                .context(format!("Error in server connection {:?}", destination))?;
+                .context(format!("Error in server connection {destination:?}"))?;
             socket.set_nodelay(true).context("Error in set_nodelay")?;
             Box::new(socket)
         }
@@ -241,7 +241,7 @@ pub fn do_run(
     let video_shared_mem = match arguments.video_shared_mem.as_deref() {
         Some(shared_mem_file) => {
             let file = fs::File::open(shared_mem_file)
-                .context(format!("Error in open shared mem {:?}", shared_mem_file))?;
+                .context(format!("Error in open shared mem {shared_mem_file:?}"))?;
             unsafe {
                 Some(
                     MmapOptions::new()
@@ -588,8 +588,7 @@ pub fn do_run(
             if img_width != new_img_width as u16 || img_height != new_img_height as u16 {
                 info!("New resolution {}x{}", new_img_width, new_img_height);
                 decoder = decoder.reload().context(format!(
-                    "Cannot reload decode with size {}x{}",
-                    new_img_width, new_img_height
+                    "Cannot reload decode with size {new_img_width}x{new_img_height}"
                 ))?;
                 img_width = new_img_width as u16;
                 img_height = new_img_height as u16;

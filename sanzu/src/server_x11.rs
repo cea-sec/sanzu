@@ -273,7 +273,7 @@ fn init_grab<C: Connection>(
                 .read(true)
                 .create(false)
                 .open(&extern_img_source_path)
-                .context(format!("Error in open {:?}", extern_img_source_path))?;
+                .context(format!("Error in open {extern_img_source_path:?}"))?;
             let extern_img_source =
                 unsafe { Mmap::map(&file).context("Cannot map extern video source")? };
             Some(extern_img_source)
@@ -693,8 +693,8 @@ fn setup_window<C: Connection>(conn: &C, screen: &Screen) -> Result<Window> {
 
 /// Find the PCI device which will be used to exfiltrate data to the host
 fn find_pci_shared_memory(searched_device: &str, searched_vendor: &str) -> Result<fs::File> {
-    let entries = fs::read_dir(PATH_PCI_DEVICES)
-        .context(format!("Error in read dir {}", PATH_PCI_DEVICES))?;
+    let entries =
+        fs::read_dir(PATH_PCI_DEVICES).context(format!("Error in read dir {PATH_PCI_DEVICES}"))?;
     for entry in entries {
         let dir = entry.context("Bad directory entry")?;
         let path = dir.path();
@@ -713,7 +713,7 @@ fn find_pci_shared_memory(searched_device: &str, searched_vendor: &str) -> Resul
                 .write(true)
                 .create(false)
                 .open(&path_resource)
-                .context(format!("Error in open {:?}", path_resource))?;
+                .context(format!("Error in open {path_resource:?}"))?;
             return Ok(file);
         }
     }
@@ -850,7 +850,7 @@ pub fn init_x11rb(
         "Windows: {:?} Root: {:x}",
         app_list
             .iter()
-            .map(|window| format!("{:x}", window))
+            .map(|window| format!("{window:x}"))
             .collect::<Vec<String>>(),
         root
     );

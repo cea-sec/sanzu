@@ -19,9 +19,8 @@ fn main() -> Result<()> {
     let about = format!(
         r#"Sanzu server: desktop video streaming
 
-Protocol version: {:?}
-"#,
-        VERSION
+Protocol version: {VERSION:?}
+"#
     );
 
     let matches = Command::new("Sanzu server")

@@ -138,7 +138,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
                     arguments.address
                 ))?;
                 let listener = vsock::VsockListener::bind(&vsock::VsockAddr::new(address, port))
-                    .context(format!("Error in VsockListener {} {}", address, port))?;
+                    .context(format!("Error in VsockListener {address} {port}"))?;
                 let (socket, addr) = listener.accept().context("failed to accept connection")?;
                 info!("Client {:?}", addr);
                 Box::new(socket)
@@ -189,7 +189,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
             let listener = TcpListener::bind(net::SocketAddr::new(address, port))?;
             let (socket, addr) = listener
                 .accept()
-                .context(format!("Error in TcpListener {} {}", address, port))?;
+                .context(format!("Error in TcpListener {address} {port}"))?;
             socket.set_nodelay(true)?;
             info!("Client {:?}", addr);
             Box::new(socket)
@@ -389,7 +389,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
             info!("Listening on control path {:?}", control_path);
             thread::spawn(move || {
                 let pid = std::process::id();
-                let control_path = control_path.replace("%PID%", &format!("{}", pid));
+                let control_path = control_path.replace("%PID%", &format!("{pid}"));
                 // Try to remove path first
                 let _ = std::fs::remove_file(&control_path);
                 let listener = std::os::unix::net::UnixListener::bind(&control_path)
@@ -524,7 +524,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
             timings_str += &timings
                 .times
                 .iter()
-                .map(|(name, value)| format!("{} {:>7.1?}", name, value))
+                .map(|(name, value)| format!("{name} {value:>7.1?}"))
                 .collect::<Vec<String>>()
                 .join(" ");
         }
