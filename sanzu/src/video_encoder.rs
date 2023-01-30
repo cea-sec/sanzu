@@ -530,12 +530,12 @@ impl Encoder for EncoderFFmpeg {
         for (key, value) in options.iter() {
             builder
                 .set_option(key, value)
-                .context(format!("Error in set_option {:?} {:?}", key, value))?;
+                .context(format!("Error in set_option {key:?} {value:?}"))?;
         }
-        let video_size = format!("{}x{}", width, height);
+        let video_size = format!("{width}x{height}");
         builder
             .set_option("video_size", &video_size)
-            .context(format!("Error in set_option video_size {:?}", video_size))?;
+            .context(format!("Error in set_option video_size {video_size:?}"))?;
         builder.set_framerate(framerate.0, framerate.1);
         if let Some(ref command) = self.command {
             builder.set_command(command)?;

@@ -94,32 +94,31 @@ pub fn get_xwd_data(data: &[u8]) -> Result<(&[u8], u32, u32, u32)> {
     let header = data.get(0..0x100).expect("Cannot get source header");
     let header_size = BigEndian::read_u32(&header[0..4]);
     if header_size > MAX_HEADER_SIZE {
-        return Err(anyhow!(format!("Strange header size {:x}", header_size)));
+        return Err(anyhow!(format!("Strange header size {header_size:x}")));
     }
     let ncolors = BigEndian::read_u32(&header[OFFSET_NCOLORS * 4..(OFFSET_NCOLORS + 1) * 4]);
     if ncolors > MAX_NCOLORS {
-        return Err(anyhow!(format!("Strange ncolors {:x}", header_size)));
+        return Err(anyhow!(format!("Strange ncolors {header_size:x}")));
     }
     let bytes_per_line =
         BigEndian::read_u32(&header[OFFSET_BYTES_PER_LINE * 4..(OFFSET_BYTES_PER_LINE + 1) * 4]);
 
     if bytes_per_line > MAX_BYTES_PER_LINE {
         return Err(anyhow!(format!(
-            "Strange bytes_per_line {:x}",
-            bytes_per_line
+            "Strange bytes_per_line {bytes_per_line:x}",
         )));
     }
     let window_x =
         BigEndian::read_u32(&header[OFFSET_WINDOW_WIDTH * 4..(OFFSET_WINDOW_WIDTH + 1) * 4]);
 
     if window_x > MAX_WINDOW_WIDTH {
-        return Err(anyhow!(format!("Strange window_x {:x}", window_x)));
+        return Err(anyhow!(format!("Strange window_x {window_x:x}")));
     }
     let window_y =
         BigEndian::read_u32(&header[OFFSET_WINDOW_HEIGHT * 4..(OFFSET_WINDOW_HEIGHT + 1) * 4]);
 
     if window_y > MAX_WINDOW_HEIGHT {
-        return Err(anyhow!(format!("Strange window_y {:x}", window_y)));
+        return Err(anyhow!(format!("Strange window_y {window_y:x}")));
     }
 
     let offset = header_size + ncolors * 0xc;

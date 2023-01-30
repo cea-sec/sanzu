@@ -25,7 +25,7 @@ rustls-pemfile = "1.0"
 sanzu-common = { path="../sanzu-common", default-features = false }
 serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
-toml = "0.6"
+toml = "0.7"
 uuid = { version = "1.2", features = ["serde", "v4"] }
 x509-parser = "0.14"
 libgssapi = { version = "0.6", optional = true }

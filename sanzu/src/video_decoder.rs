@@ -525,7 +525,7 @@ impl Decoder for DecoderFFmpeg {
         for (key, value) in options.iter() {
             builder
                 .set_option(key, value)
-                .context(format!("Error in set_option {:?} {:?}", key, value))?;
+                .context(format!("Error in set_option {key:?} {value:?}"))?;
         }
         let decoder = builder.open().context("Error in decoder open")?;
         Ok(Box::new(decoder))

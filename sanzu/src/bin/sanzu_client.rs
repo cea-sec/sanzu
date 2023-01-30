@@ -25,13 +25,12 @@ fn main() {
     let about = format!(
         r#"Sanzu client: desktop video streaming
 
-Protocol version: {:?}
+Protocol version: {VERSION:?}
 
 To change log level:
 RUST_LOG=debug
 RUST_LOG=info
-"#,
-        VERSION
+"#
     );
 
     #[cfg(windows)]

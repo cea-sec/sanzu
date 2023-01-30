@@ -8,5 +8,5 @@ fn main() {
 
     proto_files
         .iter()
-        .for_each(|x| println!("cargo:rerun-if-changed={}", x));
+        .for_each(|proto_file| println!("cargo:rerun-if-changed={proto_file}"));
 }

@@ -14,9 +14,8 @@ fn main() {
     let about = format!(
         r#"Sanzu proxy: desktop video streaming
 
-Protocol version: {:?}
-"#,
-        VERSION
+Protocol version: {VERSION:?}
+"#
     );
 
     let matches = Command::new("Sanzu proxy")
