@@ -40,8 +40,10 @@ pub struct ArgumentsSrv<'a> {
 }
 
 pub struct ArgumentsClient<'a> {
-    pub address: &'a str,
-    pub port: u16,
+    pub server_addr: &'a str,
+    pub server_port: u16,
+    #[cfg(unix)]
+    pub vsock: bool,
     pub audio: bool,
     pub audio_sample_rate: Option<u32>,
     pub audio_buffer_ms: u32,

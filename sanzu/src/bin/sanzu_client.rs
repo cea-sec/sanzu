@@ -40,17 +40,17 @@ RUST_LOG=info
         }
     }
 
-    let app = Command::new("Sanzu client")
+    let command = Command::new("Sanzu client")
         .version("0.1.0")
         .about(about)
         .arg(
-            Arg::new("ip")
+            Arg::new("server_addr")
                 .help("Sets the server IP (Ex: 127.0.0.1)")
                 .required(true)
                 .index(1),
         )
         .arg(
-            Arg::new("port")
+            Arg::new("server_port")
                 .help("Sets the server port (Ex: 1122)")
                 .required(true)
                 .value_parser(clap::value_parser!(u16))
@@ -196,24 +196,33 @@ Ex: -j c:\user\dupond\printdir\
                 .num_args(1)
                 .help("Command to execute to establish connection"),
         );
+    #[cfg(unix)]
+    let command = command.arg(
+        Arg::new("vsock")
+            .short('v')
+            .long("vsock")
+            .num_args(0)
+            .help("Use vsock"),
+    );
 
     #[cfg(feature = "kerberos")]
-    let app = app.arg(
+    let command = command.arg(
         Arg::new("server_cname")
             .help("Enable kerberos using server cname")
             .short('k')
             .long("server_cname")
             .num_args(1),
     );
+    let matches = command.get_matches();
 
-    let matches = app.get_matches();
+    let server_addr = matches
+        .get_one::<String>("server_addr")
+        .expect("Server address is mandatory");
 
-    let server_ip = matches
-        .get_one::<String>("ip")
-        .expect("IP server is mandatory");
+    let server_port = *matches.get_one::<u16>("server_port").unwrap_or(&1122);
 
-    let server_port = *matches.get_one::<u16>("port").unwrap_or(&1122);
-
+    #[cfg(unix)]
+    let vsock = matches.get_flag("vsock");
     let audio_buffer_ms = *matches.get_one::<u32>("audio_buffer_ms").unwrap_or(&150);
 
     let audio_sample_rate = matches.get_one::<u32>("audio_sample_rate").cloned();
@@ -256,8 +265,10 @@ Ex: -j c:\user\dupond\printdir\
     let shm_is_xwd = matches.get_flag("shm_is_xwd");
 
     let arguments = ArgumentsClient {
-        address: server_ip,
-        port: server_port,
+        server_addr,
+        server_port,
+        #[cfg(unix)]
+        vsock,
         audio,
         audio_sample_rate,
         audio_buffer_ms,

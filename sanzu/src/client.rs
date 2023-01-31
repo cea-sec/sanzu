@@ -205,11 +205,38 @@ pub fn do_run(
 
     let mut socket: Box<dyn ReadWrite> = match &arguments.proxycommand {
         None => {
-            let destination = format!("{}:{}", arguments.address, arguments.port);
-            let socket = TcpStream::connect(&destination)
-                .context(format!("Error in server connection {destination:?}"))?;
-            socket.set_nodelay(true).context("Error in set_nodelay")?;
-            Box::new(socket)
+            #[cfg(unix)]
+            if arguments.vsock {
+                let port = arguments.server_port as u32;
+                let address = arguments
+                    .server_addr
+                    .parse::<u32>()
+                    .expect("Not a vsock address");
+                let server = vsock::VsockStream::connect(&vsock::VsockAddr::new(address, port))
+                    .context(format!(
+                        "Error in vsock server connection {address:?} {port:?}"
+                    ))?;
+                info!("Connected to server");
+                Box::new(server)
+            } else {
+                let port = arguments.server_port;
+                let destination = format!("{}:{}", arguments.server_addr, port);
+                let server = TcpStream::connect(&destination)
+                    .context(format!("Error in tcp server connection {destination:?}"))?;
+                info!("Connected to server");
+                server.set_nodelay(true).expect("set_nodelay call failed");
+                Box::new(server)
+            }
+            #[cfg(windows)]
+            {
+                let port = arguments.server_port;
+                let destination = format!("{}:{}", arguments.server_addr, port);
+                let server = TcpStream::connect(&destination)
+                    .context(format!("Error in tcp server connection {destination:?}"))?;
+                info!("Connected to server");
+                server.set_nodelay(true).expect("set_nodelay call failed");
+                Box::new(server)
+            }
         }
         Some(commandline) => {
             /* Launch proxy command*/
