@@ -1351,6 +1351,12 @@ impl Server for ServerX11 {
                         self.modified_area = true;
                     }
                 }
+                Event::MappingNotify(event) => {
+                    trace!("{:?}", event);
+                }
+                Event::RandrNotify(event) => {
+                    trace!("{:?}", event);
+                }
                 Event::MapNotify(event) => {
                     trace!("{:?}", event);
                     let mut found_window = None;
