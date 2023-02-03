@@ -26,8 +26,6 @@ use sanzu_common::tunnel;
 
 use spin_sleep::sleep;
 
-use tempfile::NamedTempFile;
-
 use winapi::{
     ctypes::c_void,
     shared::{
@@ -41,20 +39,23 @@ use winapi::{
             D3DPRESENT_PARAMETERS, D3DSWAPEFFECT_DISCARD, D3DTEXF_NONE,
         },
         minwindef::{DWORD, LPARAM, LRESULT, TRUE, UINT, WPARAM},
-        windef::{HICON, HWND, HWND__, POINT, RECT},
+        windef::{HWND, HWND__, POINT, RECT},
     },
     um::{
         libloaderapi::{GetModuleHandleA, GetProcAddress, LoadLibraryA},
         processthreadsapi::ExitProcess,
         shellapi::ShellExecuteA,
         wingdi::{CombineRgn, ExtCreateRegion},
-        wingdi::{DeleteObject, RDH_RECTANGLES, RGNDATA, RGNDATAHEADER, RGN_OR},
+        wingdi::{
+            CreateBitmap, CreateCompatibleBitmap, DeleteObject, RDH_RECTANGLES, RGNDATA,
+            RGNDATAHEADER, RGN_OR,
+        },
         winuser::{
-            CreateWindowExA, DefWindowProcA, DestroyWindow, DispatchMessageA, GetCursorPos,
-            GetRawInputData, GetSystemMetrics, LoadCursorFromFileA, LoadImageA, PeekMessageA,
-            PostQuitMessage, RegisterClassExA, RegisterRawInputDevices, SendMessageA,
-            SetClipboardViewer, SetCursor, SetFocus, SetWindowRgn, SetWindowsHookExA,
-            TranslateMessage, ICON_BIG, IMAGE_ICON, LR_DEFAULTSIZE, LR_LOADFROMFILE, MSG,
+            CreateIconIndirect, CreateWindowExA, DefWindowProcA, DestroyIcon, DestroyWindow,
+            DispatchMessageA, GetCursorPos, GetDC, GetRawInputData, GetSystemMetrics, LoadImageA,
+            PeekMessageA, PostQuitMessage, RegisterClassExA, RegisterRawInputDevices, ReleaseDC,
+            SendMessageA, SetClipboardViewer, SetCursor, SetFocus, SetWindowRgn, SetWindowsHookExA,
+            TranslateMessage, ICONINFO, ICON_BIG, IMAGE_ICON, LR_DEFAULTSIZE, LR_LOADFROMFILE, MSG,
             PM_REMOVE, PRAWINPUT, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_NOLEGACY,
             RID_INPUT, RIM_TYPEKEYBOARD, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, WH_MOUSE_LL,
             WM_ACTIVATE, WM_CHANGECBCHAIN, WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE,
@@ -102,6 +103,10 @@ const WM_WTSSESSION_CHANGE: DWORD = 0x2B1;
 //const WTS_SESSION_LOCK: DWORD = 0x7;
 const WTS_SESSION_UNLOCK: DWORD = 0x8;
 const MIN_CURSOR_SIZE: u32 = 32;
+const MAX_CURSOR_SIZE: u32 = 2048;
+
+const MIN_HOTSPOT_SIZE: i32 = -2048;
+const MAX_HOTSPOT_SIZE: i32 = 2048;
 
 const SANZU_NAME: &str = "Sanzu";
 const SANZU_CLASS: &str = "Sanzu-class";
@@ -936,14 +941,40 @@ extern "system" fn hook_callback(_code: i32, w_param: u64, _l_param: i64) -> i64
 }
 /// Set the client cursor
 fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yhot: i32) {
-    let xhot = if xhot < 0 { 0 } else { xhot as u16 };
+    debug!(
+        "Set cursor {}x{} {}x{} {}",
+        width,
+        height,
+        xhot,
+        yhot,
+        cursor_data.len()
+    );
+    if width > MAX_CURSOR_SIZE || height > MAX_CURSOR_SIZE {
+        error!("Strange cursor size {}x{}", width, height);
+        return;
+    }
 
-    let yhot = if yhot < 0 { 0 } else { yhot as u16 };
+    if (width * height * 4) as usize != cursor_data.len() {
+        return;
+    }
 
     if width < 4 || height < 4 {
         // Skip little cursors
         return;
     }
+
+    if xhot > MAX_HOTSPOT_SIZE
+        || xhot > MAX_HOTSPOT_SIZE
+        || xhot < MIN_HOTSPOT_SIZE
+        || yhot < MIN_HOTSPOT_SIZE
+    {
+        error!("Strange cursor hot {}x{}", xhot, yhot);
+        return;
+    }
+
+    let xhot = if xhot < 0 { 0 } else { xhot as u16 };
+    let yhot = if yhot < 0 { 0 } else { yhot as u16 };
+
     trace!(
         "cursor {}x{} {},{} {}",
         width,
@@ -952,11 +983,6 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
         yhot,
         cursor_data.len()
     );
-
-    let tmpfile = NamedTempFile::new().expect("Cannot create tempfile");
-    let file = tmpfile.as_file();
-
-    let mut icon_dir = ico::IconDir::new(ico::ResourceType::Cursor);
 
     let mut cursor_bgra = vec![];
     for values in cursor_data.chunks(4) {
@@ -1013,20 +1039,34 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
         Ordering::Equal => (data, width, height),
     };
 
-    let mut image = ico::IconImage::from_rgba_data(width, height, data);
-    image.set_cursor_hotspot(Some((xhot, yhot)));
-    icon_dir.add_entry(ico::IconDirEntry::encode(&image).unwrap());
-    icon_dir.write(file).expect("Cannot write ico");
+    let mut data = data.clone();
+    unsafe {
+        let hdc = GetDC(WINHANDLE.load(atomic::Ordering::Acquire));
+        let b_col = CreateBitmap(
+            width as i32,
+            height as i32,
+            1,
+            32,
+            data.as_mut_ptr() as *mut _,
+        );
 
-    let path = tmpfile.into_temp_path();
-    let path_str = path.to_str().expect("Cannot get path");
+        let b_mask = CreateCompatibleBitmap(hdc, width as i32, height as i32);
 
-    let handle = unsafe {
-        let c_str = CString::new(path_str).unwrap();
-        let hcursor = LoadCursorFromFileA(c_str.as_ptr() as *const i8);
-        hcursor as *mut c_void
-    };
-    unsafe { SetCursor(handle as HICON) };
+        let mut iconinfo = ICONINFO::default();
+        iconinfo.fIcon = 0;
+        iconinfo.xHotspot = xhot as u32;
+        iconinfo.yHotspot = yhot as u32;
+        iconinfo.hbmMask = b_mask;
+        iconinfo.hbmColor = b_col;
+
+        let hicon = CreateIconIndirect(&mut iconinfo);
+
+        SetCursor(hicon);
+        DeleteObject(b_mask as *mut _);
+        DeleteObject(b_col as *mut _);
+        DestroyIcon(hicon as *mut _);
+        ReleaseDC(WINHANDLE.load(atomic::Ordering::Acquire), hdc);
+    }
 }
 
 pub fn init_wind3d(
