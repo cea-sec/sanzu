@@ -2318,7 +2318,6 @@ dependencies = [
  "serde",
  "serde_derive",
  "spin_sleep",
- "tempfile",
  "toml 0.7.0",
  "vsock",
  "webpki-roots",
