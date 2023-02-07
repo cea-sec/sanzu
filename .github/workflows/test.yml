@@ -100,7 +100,7 @@ jobs:
 
     - name: install cargo wix
       run: |
-        cargo install --git https://github.com/volks73/cargo-wix cargo-wix
+        cargo install --git https://github.com/volks73/cargo-wix --tag 0.3.4 cargo-wix
 
     - name: prepare vcpkg
       run: |
