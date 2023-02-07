@@ -350,7 +350,7 @@ pub fn listen_clipboard(
             clipboard.getter.atoms.property,
         ) {
             let curr = String::from_utf8_lossy(&curr);
-            let curr = curr.trim_matches('\u{0}').trim();
+            let curr = curr.trim_matches('\u{0}');
 
             if curr.is_empty() {
                 continue;
