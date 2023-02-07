@@ -374,6 +374,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
     let mut loop_helper = LoopHelper::builder().build_with_target_rate(config.video.max_fps as f64); // limit FPS if possible
 
     let mut new_size = None;
+    let mut cur_size = None;
 
     // Do socket control
     #[cfg(unix)]
@@ -412,23 +413,26 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
 
         let mut events = vec![];
         if let Some((width, height)) = new_size.take() {
-            if !arguments.keep_server_resolution {
-                match server_info.change_resolution(config, width, height) {
-                    Ok(_) => {
-                        // Create new encoder only if we change resolution
-                        debug!("New codec {}x{}", width, height);
-                        video_encoder = video_encoder
-                            .change_resolution(width, height)
-                            .context("Cannot change codec resolution")?;
-                        let msg = tunnel::EventDisplay { width, height };
-                        let msg = tunnel::MessageSrv {
-                            msg: Some(tunnel::message_srv::Msg::Display(msg)),
-                        };
-                        events.push(msg);
-                    }
-                    Err(err) => {
-                        warn!("Error in change_resolution");
-                        err.chain().for_each(|cause| error!(" - due to {}", cause));
+            if Some((width, height)) != cur_size && width != 0 && height != 0 {
+                if !arguments.keep_server_resolution {
+                    match server_info.change_resolution(config, width, height) {
+                        Ok(_) => {
+                            cur_size = Some((width, height));
+                            // Create new encoder only if we change resolution
+                            debug!("New codec {}x{}", width, height);
+                            video_encoder = video_encoder
+                                .change_resolution(width, height)
+                                .context("Cannot change codec resolution")?;
+                            let msg = tunnel::EventDisplay { width, height };
+                            let msg = tunnel::MessageSrv {
+                                msg: Some(tunnel::message_srv::Msg::Display(msg)),
+                            };
+                            events.push(msg);
+                        }
+                        Err(err) => {
+                            warn!("Error in change_resolution");
+                            err.chain().for_each(|cause| error!(" - due to {}", cause));
+                        }
                     }
                 }
             }
