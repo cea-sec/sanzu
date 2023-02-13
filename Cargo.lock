@@ -278,9 +278,9 @@ dependencies = [
 
 [[package]]
 name = "bindgen"
-version = "0.63.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36d860121800b2a9a94f9b5604b332d5cffb234ce17609ea479d723dbc9d3885"
+checksum = "c4243e6031260db77ede97ad86c27e501d646a27ab57b59a574f725d98ab1fb4"
 dependencies = [
  "bitflags",
  "cexpr",
@@ -2285,7 +2285,7 @@ name = "sanzu"
 version = "0.1.1"
 dependencies = [
  "anyhow",
- "bindgen 0.63.0",
+ "bindgen 0.64.0",
  "byteorder",
  "cc",
  "clap 4.1.1",
@@ -2333,7 +2333,7 @@ name = "sanzu-common"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bindgen 0.63.0",
+ "bindgen 0.64.0",
  "byteorder",
  "env_logger 0.10.0",
  "libgssapi",
@@ -2353,7 +2353,7 @@ name = "sanzu_broker"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bindgen 0.63.0",
+ "bindgen 0.64.0",
  "byteorder",
  "cc",
  "clap 4.1.1",
