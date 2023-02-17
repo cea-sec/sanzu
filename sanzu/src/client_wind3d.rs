@@ -303,23 +303,116 @@ impl ClientWindows {
     }
 }
 
-/* IDirect3D9 wrapper structure */
-struct SanzuDirect3D {
-    direct3d: *mut IDirect3D9,
-    device: *mut IDirect3DDevice9,
-    surface: *mut IDirect3DSurface9,
+// Wrap Direct3DSurface to be sure we call Release on object deallocation
+struct Direct3DSurface {
+    inner: *mut IDirect3DSurface9,
 }
 
-impl Drop for SanzuDirect3D {
+impl Direct3DSurface {
+    fn new(surface: *mut IDirect3DSurface9) -> Self {
+        Direct3DSurface { inner: surface }
+    }
+
+    fn get_inner(&mut self) -> *mut IDirect3DSurface9 {
+        self.inner
+    }
+}
+
+/**
+We check the Release return code to ensure the object is freed with success
+This will ensure no memory leak during runtime
+**/
+impl Drop for Direct3DSurface {
     fn drop(&mut self) {
-        if let Some(direct3d) = unsafe { self.direct3d.as_ref() } {
-            unsafe { direct3d.Release() };
+        if let Some(surface) = unsafe { self.inner.as_ref() } {
+            let ret = unsafe { surface.Release() };
+            if ret != 0 {
+                panic!("Error during surface release");
+            }
         }
-        if let Some(device) = unsafe { self.device.as_ref() } {
-            unsafe { device.Release() };
+    }
+}
+
+// Wrap IDirect3DDevice9 to be sure we call Release on object deallocation
+struct Direct3DDevice {
+    inner: *mut IDirect3DDevice9,
+}
+
+impl Direct3DDevice {
+    fn new(device: *mut IDirect3DDevice9) -> Self {
+        Direct3DDevice { inner: device }
+    }
+
+    fn get_inner(&mut self) -> *mut IDirect3DDevice9 {
+        self.inner
+    }
+}
+
+/**
+We check the Release return code to ensure the object is freed with success
+This will ensure no memory leak during runtime
+**/
+impl Drop for Direct3DDevice {
+    fn drop(&mut self) {
+        if let Some(device) = unsafe { self.inner.as_ref() } {
+            let ret = unsafe { device.Release() };
+            if ret != 0 {
+                panic!("Error during device release");
+            }
         }
-        if let Some(surface) = unsafe { self.surface.as_ref() } {
-            unsafe { surface.Release() };
+    }
+}
+
+// Wrap IDirect3D9 to be sure we call Release on object deallocation
+struct Direct3D {
+    inner: *mut IDirect3D9,
+}
+
+impl Direct3D {
+    fn new(direct3d: *mut IDirect3D9) -> Self {
+        Direct3D { inner: direct3d }
+    }
+
+    fn get_inner(&mut self) -> *mut IDirect3D9 {
+        self.inner
+    }
+}
+
+/**
+We check the Release return code to ensure the object is freed with success
+This will ensure no memory leak during runtime
+**/
+impl Drop for Direct3D {
+    fn drop(&mut self) {
+        if let Some(direct3d) = unsafe { self.inner.as_ref() } {
+            let ret = unsafe { direct3d.Release() };
+            if ret != 0 {
+                panic!("Error during direct3d release");
+            }
+        }
+    }
+}
+
+/**
+IDirect3D9 wrapper structure
+The fields' drop order is important here:
+The surface must be freed before the device, before the direct3d object
+We rely on https://doc.rust-lang.org/reference/destructors.html to ensure drop order
+'The fields of a struct are dropped in declaration order.'
+**/
+#[allow(dead_code)]
+struct SanzuDirect3D {
+    surface: Direct3DSurface,
+    device: Direct3DDevice,
+    direct3d: Direct3D,
+}
+
+impl SanzuDirect3D {
+    fn new(direct3d: Direct3D, device: Direct3DDevice, surface: Direct3DSurface) -> Self {
+        SanzuDirect3D {
+            direct3d,
+            device,
+            surface,
         }
     }
 }
@@ -332,6 +425,8 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
     if p_direct3d.is_null() {
         return Err(anyhow!("Direct3DCreate9 returned null"));
     }
+
+    let mut direct3d = Direct3D::new(p_direct3d);
 
     *SCREEN_SIZE.lock().unwrap() = (width, height);
 
@@ -352,8 +447,9 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
         PresentationInterval: 0,
     };
 
+    let direct3d_ref = direct3d.get_inner().as_ref().context("Null direct3d")?;
+
     let mut p_direct3d_device: *mut IDirect3DDevice9 = null_mut();
-    let direct3d_ref = p_direct3d.as_ref().context("Null direct3d")?;
 
     if direct3d_ref.CreateDevice(
         D3DADAPTER_DEFAULT,
@@ -368,10 +464,12 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
         return Err(anyhow!("Cannot create d3d device"));
     }
 
-    let device = p_direct3d_device.as_ref().context("Null direct3ddevice")?;
+    let mut device = Direct3DDevice::new(p_direct3d_device);
+
+    let device_ref = device.get_inner().as_ref().context("Null direct3ddevice")?;
 
     let mut p_direct3d_surface: *mut IDirect3DSurface9 = null_mut();
-    if device.CreateOffscreenPlainSurface(
+    if device_ref.CreateOffscreenPlainSurface(
         width,
         height,
         D3DFMT_X8R8G8B8,
@@ -380,16 +478,12 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
         null_mut(),
     ) != 0
     {
-        device.Release();
-        direct3d_ref.Release();
         return Err(anyhow!("Error in CreateOffscreenPlainSurface"));
     }
 
-    let sanzu_direct3d = SanzuDirect3D {
-        direct3d: p_direct3d,
-        device: p_direct3d_device,
-        surface: p_direct3d_surface,
-    };
+    let surface = Direct3DSurface::new(p_direct3d_surface);
+
+    let sanzu_direct3d = SanzuDirect3D::new(direct3d, device, surface);
 
     Ok(sanzu_direct3d)
 }
@@ -406,9 +500,17 @@ unsafe fn render(
     height: u32,
 ) -> Result<()> {
     let mut d3d_rect = D3DLOCKED_RECT::default();
-    let device = sanzu_direct3d.device.as_ref().context("Null device")?;
+    let device = sanzu_direct3d
+        .device
+        .get_inner()
+        .as_ref()
+        .context("Null device")?;
 
-    let surface = sanzu_direct3d.surface.as_ref().context("Null surface")?;
+    let surface = sanzu_direct3d
+        .surface
+        .get_inner()
+        .as_ref()
+        .context("Null surface")?;
 
     let ret = surface.LockRect(&mut d3d_rect as *mut _, null_mut(), D3DLOCK_DONOTWAIT);
     if ret == -1 {
@@ -465,6 +567,8 @@ unsafe fn render(
         return Err(anyhow!("Error in getbackbuffer: {:?}", ret));
     }
 
+    let mut back_buffer = Direct3DSurface::new(p_back_buffer);
+
     /* Use rect with img size to avoid stretching */
     let new_rect = RECT {
         left: 0,
@@ -474,9 +578,9 @@ unsafe fn render(
     };
 
     if device.StretchRect(
-        sanzu_direct3d.surface as *mut _,
+        sanzu_direct3d.surface.get_inner() as *mut _,
         null_mut(),
-        p_back_buffer,
+        back_buffer.get_inner(),
         &new_rect as *const _,
         D3DTEXF_NONE,
     ) != 0
@@ -491,7 +595,6 @@ unsafe fn render(
     if device.Present(null_mut(), null_mut(), null_mut(), null_mut()) != 0 {
         return Err(anyhow!("Error in Present: {:?}", ret));
     }
-    (*p_back_buffer).Release();
     Ok(())
 }
 
