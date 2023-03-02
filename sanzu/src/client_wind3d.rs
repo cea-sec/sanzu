@@ -35,7 +35,7 @@ use winapi::{
         },
         d3d9types::{
             D3DBACKBUFFER_TYPE_MONO, D3DCLEAR_TARGET, D3DCOLOR_XRGB, D3DDEVTYPE_HAL,
-            D3DFMT_UNKNOWN, D3DFMT_X8R8G8B8, D3DLOCKED_RECT, D3DLOCK_DONOTWAIT, D3DPOOL_DEFAULT,
+            D3DFMT_UNKNOWN, D3DFMT_X8R8G8B8, D3DLOCKED_RECT, D3DPOOL_DEFAULT,
             D3DPRESENT_PARAMETERS, D3DSWAPEFFECT_DISCARD, D3DTEXF_NONE,
         },
         minwindef::{DWORD, LPARAM, LRESULT, TRUE, UINT, WPARAM},
@@ -512,9 +512,9 @@ unsafe fn render(
         .as_ref()
         .context("Null surface")?;
 
-    let ret = surface.LockRect(&mut d3d_rect as *mut _, null_mut(), D3DLOCK_DONOTWAIT);
-    if ret == -1 {
-        return Err(anyhow!("Error in lockrect {:?}", ret));
+    let ret = surface.LockRect(&mut d3d_rect as *mut _, null_mut(), 0);
+    if ret != 0 {
+        return Err(anyhow!("Error in lockrect {:x?}", ret));
     }
 
     let mut p_src = data;
@@ -525,9 +525,9 @@ unsafe fn render(
 
     if p_dest.is_null() {
         // Unlock locked surface
-        let lret = surface.UnlockRect();
-        if lret == -1 {
-            return Err(anyhow!("Error in unlockrect {}", lret));
+        let ret = surface.UnlockRect();
+        if ret != 0 {
+            return Err(anyhow!("Error in unlockrect {}", ret));
         }
         return Err(anyhow!("Error: pBits is null"));
     } else {
@@ -542,7 +542,7 @@ unsafe fn render(
     drop(p_src);
 
     let ret = surface.UnlockRect();
-    if ret == -1 {
+    if ret != 0 {
         return Err(anyhow!("Error in UnlockRect {:?}", ret));
     }
 
