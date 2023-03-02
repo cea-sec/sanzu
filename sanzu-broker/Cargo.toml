@@ -1,6 +1,6 @@
 [package]
 name = "sanzu_broker"
-version = "0.1.0"
+version = "0.1.2"
 authors = ["Fabrice Desclaux <fabrice.desclaux@cea.fr>"]
 edition = "2018"
 readme = "README.md"
