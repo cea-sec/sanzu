@@ -881,11 +881,6 @@ impl Client for ClientInfo {
                 }
                 Event::FocusIn(event) => {
                     trace!("Focus in {:?}", event);
-                    let eventwinactivate = tunnel::EventWinActivate { id: 0 };
-                    let msg_event = tunnel::MessageClient {
-                        msg: Some(tunnel::message_client::Msg::Activate(eventwinactivate)),
-                    };
-                    events.push(msg_event);
 
                     self.need_update = true;
                     // If caps/num/scroll locks have changed during out of focus,
