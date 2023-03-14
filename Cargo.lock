@@ -884,11 +884,11 @@ dependencies = [
 
 [[package]]
 name = "ffmpeg-sys-next"
-version = "5.1.1"
+version = "6.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d780b36e092254367e2f1f21191992735c8e23f31a5a5a8678db3a79f775021f"
+checksum = "cf650f461ccf130f4eef4927affed703cc387b183bfc4a7dfee86a076c131127"
 dependencies = [
- "bindgen 0.59.2",
+ "bindgen 0.64.0",
  "cc",
  "libc",
  "num_cpus",
@@ -1648,11 +1648,11 @@ dependencies = [
 
 [[package]]
 name = "num_cpus"
-version = "1.14.0"
+version = "1.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6058e64324c71e02bc2b150e4f3bc8286db6c83092132ffa3f6b1eab0f9def5"
+checksum = "0fac9e2da13b5eb447a6ce3d392f23a29d8694bff781bf03a16cd9ac8697593b"
 dependencies = [
- "hermit-abi 0.1.19",
+ "hermit-abi 0.2.6",
  "libc",
 ]
 
