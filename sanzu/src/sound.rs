@@ -1,6 +1,7 @@
 use anyhow::{Context, Result};
 use byteorder::{LittleEndian, WriteBytesExt};
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
+use cpal::Sample;
 use cpal::SampleRate;
 use sanzu_common::tunnel;
 use std::{
@@ -24,12 +25,12 @@ fn enqueue_from_source<T, U>(
     max_buffer_ms: u64,
 ) where
     T: cpal::Sample,
-    U: cpal::Sample + hound::Sample,
+    U: cpal::Sample + hound::Sample + cpal::FromSample<T>,
 {
     let mut data = vec![];
     for &sample in input.iter() {
-        let sample: U = cpal::Sample::from(&sample);
-        data.push(sample.to_i16());
+        let sample: U = U::from_sample(sample);
+        data.push(sample.as_i16());
     }
 
     let mut buffering_queue_guard = buffering_queue.lock().unwrap();
@@ -115,9 +116,10 @@ pub fn init_sound_encoder(
             .build_input_stream(
                 &config.into(),
                 move |data, _: &_| {
-                    enqueue_from_source::<f32, f32>(data, buffering_queue.clone(), max_buffer_ms)
+                    enqueue_from_source::<f32, i16>(data, buffering_queue.clone(), max_buffer_ms)
                 },
                 err_fn,
+                None,
             )
             .context("Error in build_input_stream")?,
         cpal::SampleFormat::I16 => device
@@ -127,6 +129,7 @@ pub fn init_sound_encoder(
                     enqueue_from_source::<i16, i16>(data, buffering_queue.clone(), max_buffer_ms)
                 },
                 err_fn,
+                None,
             )
             .context("Error in build_input_stream")?,
         cpal::SampleFormat::U16 => device
@@ -136,8 +139,14 @@ pub fn init_sound_encoder(
                     enqueue_from_source::<u16, i16>(data, buffering_queue.clone(), max_buffer_ms)
                 },
                 err_fn,
+                None,
             )
             .context("Error in build_input_stream")?,
+        sample_format => {
+            return Err(anyhow::Error::msg(format!(
+                "Unsupported sample format '{sample_format}'"
+            )))
+        }
     };
 
     Ok(stream)
@@ -268,6 +277,7 @@ impl SoundDecoder {
                         dequeue_to_sink(data, channels, &sound_queue_cp, audio_buffer_ms)
                     },
                     err_fn,
+                    None,
                 )
                 .context("Error in build_output_stream")?,
             cpal::SampleFormat::I16 => device
@@ -277,6 +287,7 @@ impl SoundDecoder {
                         dequeue_to_sink(data, channels, &sound_queue_cp, audio_buffer_ms)
                     },
                     err_fn,
+                    None,
                 )
                 .context("Error in build_output_stream")?,
             cpal::SampleFormat::U16 => device
@@ -286,8 +297,14 @@ impl SoundDecoder {
                         dequeue_to_sink(data, channels, &sound_queue_cp, audio_buffer_ms)
                     },
                     err_fn,
+                    None,
                 )
                 .context("Error in build_output_stream")?,
+            sample_format => {
+                return Err(anyhow::Error::msg(format!(
+                    "Unsupported sample format '{sample_format}'"
+                )))
+            }
         };
 
         Ok(SoundDecoder {
@@ -312,7 +329,7 @@ fn dequeue_to_sink<T>(
     sound_data: &Arc<Mutex<VecDeque<i16>>>,
     audio_buffer_ms: u32,
 ) where
-    T: cpal::Sample,
+    T: cpal::Sample + cpal::FromSample<i16>,
 {
     let mut count = 0;
     let mut count_bad = 0;
@@ -328,7 +345,8 @@ fn dequeue_to_sink<T>(
                 0
             };
 
-            *sample = cpal::Sample::from(&(value));
+            let value = value.to_sample();
+            *sample = value;
         }
     }
     if count_bad != 0 {
