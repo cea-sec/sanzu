@@ -108,7 +108,6 @@ const MAX_CURSOR_SIZE: u32 = 2048;
 const MIN_HOTSPOT_SIZE: i32 = -2048;
 const MAX_HOTSPOT_SIZE: i32 = 2048;
 
-const SANZU_NAME: &str = "Sanzu";
 const SANZU_CLASS: &str = "Sanzu-class";
 
 enum AreaManager {
@@ -1192,6 +1191,7 @@ pub fn init_wind3d(
     );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
     let window_mode = argumets.window_mode;
+    let window_title = argumets.title.clone().as_bytes().to_vec();
 
     if window_mode {
         seamless = false;
@@ -1256,7 +1256,7 @@ pub fn init_wind3d(
         };
         info!("img {:?}", img);
 
-        let window_name = CString::new(SANZU_NAME).expect("Error in create CString name");
+        let window_name = CString::new(window_title).expect("Error in create CString name");
         let window_name_ptr = window_name.as_ptr();
 
         let mut window_style = WS_VISIBLE | WS_CLIPSIBLINGS | WS_CLIPCHILDREN;

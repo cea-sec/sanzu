@@ -3,4 +3,5 @@
 RUST_LOG=info sanzu_client $SANZU_SERVER_IP 11498 --tls_server_name localhost \
     --tls_ca /sanzu_demo/certs/rootCA.crt \
     --client_cert /sanzu_demo/certs/client1.crt \
-    --client_key /sanzu_demo/certs/client1.key
+    --client_key /sanzu_demo/certs/client1.key \
+    --title "Sanzu Client Demo"

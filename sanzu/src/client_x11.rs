@@ -189,14 +189,13 @@ fn setup_window<C: Connection>(
     )
     .context("Error in create_window")?;
 
-    let title = "Surf client";
     if let Err(err) = conn
         .change_property8(
             PropMode::REPLACE,
             win_id,
             AtomEnum::WM_NAME,
             AtomEnum::STRING,
-            title.as_bytes(),
+            arguments.title.as_bytes(),
         )
         .context("Error on change window name")
     {

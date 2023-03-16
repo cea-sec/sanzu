@@ -61,6 +61,7 @@ pub struct ArgumentsClient<'a> {
     pub sync_key_locks: bool,
     pub video_shared_mem: Option<String>,
     pub shm_is_xwd: bool,
+    pub title: &'a str,
 }
 
 pub struct ArgumentsProxy<'a> {
