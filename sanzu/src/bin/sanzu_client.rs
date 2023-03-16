@@ -200,7 +200,7 @@ Ex: -j c:\user\dupond\printdir\
             Arg::new("title")
                 .long("title")
                 .num_args(1)
-                .help("Window's title (default: 'Surf client')"),
+                .help("Window's title (default: 'Sanzu client')"),
         );
     #[cfg(unix)]
     let command = command.arg(
@@ -269,7 +269,7 @@ Ex: -j c:\user\dupond\printdir\
     let sync_key_locks = matches.get_flag("sync_key_locks");
     let import_video_shm = matches.get_one::<String>("import_video_shm").cloned();
     let shm_is_xwd = matches.get_flag("shm_is_xwd");
-    let default_title = "Surf client".to_string();
+    let default_title = "Sanzu client".to_string();
     let title = matches
         .get_one::<String>("title")
         .unwrap_or(&default_title)
