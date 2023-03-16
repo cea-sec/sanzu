@@ -41,7 +41,7 @@ dbus = { version = "0.9", optional = true }
 dbus-crossroads = { version = "0.5", optional = true }
 notify-rust = { version = "4.8", features = ["images"], optional = true }
 webpki-roots = "0.22"
-rayon = "1.6"
+rayon = "1.7"
 x509-parser = "0.14"
 
 [target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
