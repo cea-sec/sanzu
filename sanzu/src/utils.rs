@@ -62,6 +62,7 @@ pub struct ArgumentsClient<'a> {
     pub video_shared_mem: Option<String>,
     pub shm_is_xwd: bool,
     pub title: &'a str,
+    pub grab_keyboard: bool,
 }
 
 pub struct ArgumentsProxy<'a> {
