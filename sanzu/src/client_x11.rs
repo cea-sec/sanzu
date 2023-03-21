@@ -42,6 +42,7 @@ const KEY_SHIFT: usize = 50;
 const KEY_ALT: usize = 64;
 const KEY_S: usize = 39;
 const KEY_C: usize = 54;
+const KEY_H: usize = 43;
 
 struct FreePixmap<'c, C: Connection>(&'c C, Pixmap);
 impl<C: Connection> Drop for FreePixmap<'_, C> {
@@ -96,6 +97,7 @@ pub struct WindowInfo {
 pub struct ClientInfo {
     /// x11rb connection
     pub conn: RustConnection<DefaultStream>,
+    pub root: u32,
     /// Max request size for x11
     pub max_request_size: usize,
     /// Current screen index
@@ -135,6 +137,8 @@ pub struct ClientInfo {
     pub sync_key_locks_needed: bool,
     /// Stores windows
     pub areas: Vec<(usize, Area)>,
+    /// Stores grab_keyboard flag
+    pub grab_keyboard: bool,
 }
 
 fn create_gc<C: Connection>(
@@ -372,14 +376,28 @@ pub fn init_x11rb(
     let window_info =
         new_area(&conn, arguments, screen, (width, height)).context("Error in new_area")?;
 
+    if arguments.grab_keyboard {
+        conn.grab_keyboard(
+            false,
+            screen.root,
+            0u32,
+            x11rb::protocol::xproto::GrabMode::ASYNC,
+            x11rb::protocol::xproto::GrabMode::ASYNC,
+        )
+        .context("Error in grab keyboard")?
+        .reply()
+        .context("Error in grab keyboard replyerror")?;
+    }
+
     let black_gc = create_gc(&conn, screen.root, screen.black_pixel, screen.black_pixel)
         .context("Error in create_gc")?;
     let keys_state = vec![false; 0x100];
 
     let clipboard = Clipboard::new().context("Error in clipboard creation")?;
-
+    let root = screen.root;
     let client_info = ClientInfo {
         conn,
+        root,
         max_request_size,
         screen_num,
         width,
@@ -400,6 +418,7 @@ pub fn init_x11rb(
         sync_key_locks: arguments.sync_key_locks,
         sync_key_locks_needed: arguments.sync_key_locks,
         areas: vec![],
+        grab_keyboard: arguments.grab_keyboard,
     };
 
     Ok(Box::new(client_info))
@@ -559,6 +578,48 @@ fn key_state_to_bool(state: lock_keys::LockKeyState) -> bool {
         lock_keys::LockKeyState::Enabled => true,
         lock_keys::LockKeyState::Disabled => false,
     }
+}
+
+fn focus_in(client: &mut ClientInfo) -> Result<()> {
+    client.conn.flush().context("Error in x11rb flush")?;
+    client
+        .conn
+        .grab_keyboard(
+            true,
+            client.root,
+            0u32,
+            x11rb::protocol::xproto::GrabMode::ASYNC,
+            x11rb::protocol::xproto::GrabMode::ASYNC,
+        )
+        .context("Error in grab keyboard")?
+        .reply()
+        .context("Error in grab keyboard replyerror")?;
+    client.conn.flush().context("Error in x11rb flush")?;
+    Ok(())
+}
+
+fn focus_out(client: &mut ClientInfo) -> Result<Vec<tunnel::MessageClient>> {
+    let mut events = vec![];
+    /* On focus out, release each pushed keys */
+    for (index, key_state) in client.keys_state.iter_mut().enumerate() {
+        if *key_state {
+            *key_state = false;
+            let eventkey = tunnel::EventKey {
+                keycode: index as u32,
+                updown: false,
+            };
+            let msg_event = tunnel::MessageClient {
+                msg: Some(tunnel::message_client::Msg::Key(eventkey)),
+            };
+            events.push(msg_event);
+        }
+    }
+    client.conn.flush().context("Error in x11rb flush")?;
+
+    info!("call ungrab!");
+    client.conn.ungrab_keyboard(0u32).context("Cannot ungrab")?;
+    client.conn.flush().context("Error in x11rb flush")?;
+    Ok(events)
 }
 
 impl Client for ClientInfo {
@@ -857,6 +918,26 @@ impl Client for ClientInfo {
                         }
                     }
 
+                    // If Ctrl alt shift h => toggle grab keyboard
+                    if event.detail == KEY_H as u8 {
+                        // Ctrl Shift Alt
+                        if self.keys_state[KEY_CTRL]
+                            && self.keys_state[KEY_SHIFT]
+                            && self.keys_state[KEY_ALT]
+                        {
+                            if self.grab_keyboard {
+                                let mut events_focus =
+                                    focus_out(self).context("Cannot focus out")?;
+                                events.append(&mut events_focus);
+                            } else {
+                                focus_in(self).context("Cannot focus in")?;
+                            }
+
+                            self.grab_keyboard = !self.grab_keyboard;
+                            info!("Toggle ungrab Keyboard {}", self.grab_keyboard);
+                        }
+                    }
+
                     let eventkey = tunnel::EventKey {
                         keycode: event.detail as u32,
                         updown: true,
@@ -880,27 +961,26 @@ impl Client for ClientInfo {
                 }
                 Event::FocusIn(event) => {
                     trace!("Focus in {:?}", event);
+                    if self.grab_keyboard {
+                        focus_in(self).context("Cannot focus in")?;
+                    }
+                    let eventwinactivate = tunnel::EventWinActivate { id: 0 };
+                    let msg_event = tunnel::MessageClient {
+                        msg: Some(tunnel::message_client::Msg::Activate(eventwinactivate)),
+                    };
+                    events.push(msg_event);
 
                     self.need_update = true;
                     // If caps/num/scroll locks have changed during out of focus,
                     // force keys state synchro
                     self.sync_key_locks_needed = true;
                 }
-                Event::FocusOut(_) => {
-                    trace!("Focus out");
-                    /* On focus out, release each pushed keys */
-                    for (index, key_state) in self.keys_state.iter_mut().enumerate() {
-                        if *key_state {
-                            *key_state = false;
-                            let eventkey = tunnel::EventKey {
-                                keycode: index as u32,
-                                updown: false,
-                            };
-                            let msg_event = tunnel::MessageClient {
-                                msg: Some(tunnel::message_client::Msg::Key(eventkey)),
-                            };
-                            events.push(msg_event);
-                        }
+                Event::FocusOut(event) => {
+                    trace!("Focus out {:?}", event);
+
+                    if self.grab_keyboard && event.mode == NotifyMode::WHILE_GRABBED {
+                        let mut events_focus = focus_out(self).context("Cannot focus out")?;
+                        events.append(&mut events_focus);
                     }
                 }
                 Event::NoExposure(_event) => {}

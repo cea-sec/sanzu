@@ -201,6 +201,17 @@ Ex: -j c:\user\dupond\printdir\
                 .long("title")
                 .num_args(1)
                 .help("Window's title (default: 'Sanzu client')"),
+        )
+        .arg(
+            Arg::new("grab_keyboard")
+                .help(
+                    "Grab and keep keyboard on focus.\n\
+                     This allows (linux) sending special keys like alt-tab\
+                     without being interpreted by the local window manager"
+                )
+                .short('u')
+                .long("grab_keyboard")
+                .action(ArgAction::SetTrue),
         );
     #[cfg(unix)]
     let command = command.arg(
@@ -240,6 +251,7 @@ Ex: -j c:\user\dupond\printdir\
     let client_key = matches.get_one::<String>("client_key").cloned();
     let tls_server_name = matches.get_one::<String>("tls_server_name").cloned();
     let login = matches.get_flag("login");
+    let grab_keyboard = matches.get_flag("grab_keyboard");
 
     let clipboard_config = match matches
         .get_one::<String>("clipboard")
@@ -298,6 +310,7 @@ Ex: -j c:\user\dupond\printdir\
         video_shared_mem: import_video_shm,
         shm_is_xwd,
         title,
+        grab_keyboard,
     };
 
     if let Err(err) = client::run(
