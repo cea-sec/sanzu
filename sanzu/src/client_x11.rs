@@ -580,6 +580,35 @@ fn key_state_to_bool(state: lock_keys::LockKeyState) -> bool {
     }
 }
 
+/**
+If sanzu looses the focus from the local window manager, we release the current
+pressed keys. For each pressed key, we will send an event to the server release
+the key.
+**/
+fn release_keys(client: &mut ClientInfo) -> Result<Vec<tunnel::MessageClient>> {
+    let mut events = vec![];
+    /* On focus out, release each pushed keys */
+    for (index, key_state) in client.keys_state.iter_mut().enumerate() {
+        if *key_state {
+            *key_state = false;
+            let eventkey = tunnel::EventKey {
+                keycode: index as u32,
+                updown: false,
+            };
+            let msg_event = tunnel::MessageClient {
+                msg: Some(tunnel::message_client::Msg::Key(eventkey)),
+            };
+            events.push(msg_event);
+        }
+    }
+    client.conn.flush().context("Error in x11rb flush")?;
+    Ok(events)
+}
+
+/**
+If sanzu gets the focus from the local window manager, we force the wm to grab
+*every* keys (event those handled by the local window manager)
+**/
 fn focus_in(client: &mut ClientInfo) -> Result<()> {
     client.conn.flush().context("Error in x11rb flush")?;
     client
@@ -598,23 +627,19 @@ fn focus_in(client: &mut ClientInfo) -> Result<()> {
     Ok(())
 }
 
+/**
+If sanzu losses the focus from the local window manager, we ungrab whole keys
+event (so that the local window manager can handle back it's shortcuts.
+**/
 fn focus_out(client: &mut ClientInfo) -> Result<Vec<tunnel::MessageClient>> {
-    let mut events = vec![];
     /* On focus out, release each pushed keys */
-    for (index, key_state) in client.keys_state.iter_mut().enumerate() {
-        if *key_state {
-            *key_state = false;
-            let eventkey = tunnel::EventKey {
-                keycode: index as u32,
-                updown: false,
-            };
-            let msg_event = tunnel::MessageClient {
-                msg: Some(tunnel::message_client::Msg::Key(eventkey)),
-            };
-            events.push(msg_event);
+    let events = match release_keys(client) {
+        Err(err) => {
+            warn!("Cannot release keys {:?}", err);
+            vec![]
         }
-    }
-    client.conn.flush().context("Error in x11rb flush")?;
+        Ok(events) => events,
+    };
 
     info!("call ungrab!");
     client.conn.ungrab_keyboard(0u32).context("Cannot ungrab")?;
@@ -978,9 +1003,20 @@ impl Client for ClientInfo {
                 Event::FocusOut(event) => {
                     trace!("Focus out {:?}", event);
 
-                    if self.grab_keyboard && event.mode == NotifyMode::WHILE_GRABBED {
-                        let mut events_focus = focus_out(self).context("Cannot focus out")?;
-                        events.append(&mut events_focus);
+                    if self.grab_keyboard {
+                        if event.mode == NotifyMode::WHILE_GRABBED {
+                            let mut events_focus = focus_out(self).context("Cannot focus out")?;
+                            events.append(&mut events_focus);
+                        }
+                    } else {
+                        let mut events_keys = match release_keys(self) {
+                            Err(err) => {
+                                warn!("Cannot release keys: {:?}", err);
+                                vec![]
+                            }
+                            Ok(events) => events,
+                        };
+                        events.append(&mut events_keys);
                     }
                 }
                 Event::NoExposure(_event) => {}
