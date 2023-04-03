@@ -85,9 +85,9 @@ pub fn make_server_config(
     let certs = load_certs(server_cert).context("Cannot load server ceritifactes")?;
 
     let client_auth = if auth_client {
-        AllowAnyAuthenticatedClient::new(client_auth_roots)
+        AllowAnyAuthenticatedClient::new(client_auth_roots).boxed()
     } else {
-        AllowAnyAnonymousOrAuthenticatedClient::new(client_auth_roots)
+        AllowAnyAnonymousOrAuthenticatedClient::new(client_auth_roots).boxed()
     };
 
     let suites = rustls::ALL_CIPHER_SUITES.to_vec();
@@ -189,7 +189,6 @@ pub fn make_client_config(
     };
 
     config.key_log = Arc::new(rustls::KeyLogFile::new());
-    config.enable_tickets = false;
     config.enable_sni = false;
     Ok(Arc::new(config))
 }
