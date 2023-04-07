@@ -56,6 +56,15 @@ use x11rb::{
     COPY_DEPTH_FROM_PARENT,
 };
 
+x11rb::atom_manager! {
+    pub AtomCollection: AtomCollectionCookie {
+        _NET_CLIENT_LIST,
+        _NET_WM_STATE,
+        _NET_WM_NAME,
+        _NET_ACTIVE_WINDOW,
+    }
+}
+
 /// Holds information on a server side window.
 ///
 /// TODO: for now, we only support rectangle windows.
@@ -260,7 +269,12 @@ fn init_grab<C: Connection>(
 }
 
 /// Creates Area linked to a `window`
-pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Result<Area> {
+pub fn init_area<C: Connection>(
+    conn: &C,
+    root: Window,
+    window: Window,
+    atoms: &AtomCollection,
+) -> Result<Area> {
     let geometry = conn
         .get_geometry(window)
         .context("Error in get geometry")?
@@ -284,7 +298,7 @@ pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Resul
 
         for child in windows_children.iter() {
             if app_list.contains(child) {
-                if let Ok(name) = get_window_name(conn, *child) {
+                if let Ok(name) = get_window_name(conn, *child, atoms) {
                     app_name = name;
                 }
                 trace!("child {:x}: {}", *child, app_name);
@@ -311,6 +325,8 @@ pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Resul
 pub struct ServerX11 {
     /// x11 connection handle
     pub conn: RustConnection,
+    /// x11 atoms
+    atoms: AtomCollection,
     /// x11 graphic information
     pub grabinfo: GrabInfo,
     /// Frame rate limit (see config)
@@ -394,15 +410,13 @@ pub fn get_window_state<C: Connection>(conn: &C, window: Window) -> Result<Vec<W
     get_property32(conn, window, b"_NET_WM_STATE", AtomEnum::ATOM)
 }
 
-pub fn get_window_name<C: Connection>(conn: &C, window: Window) -> Result<String> {
-    let atom_string_target = conn
-        .intern_atom(false, b"_NET_WM_NAME")
-        .context("Error in intern_atom")?
-        .reply()
-        .context("Error in intern_atom reply")?;
-    let atom_property_a: Atom = atom_string_target.atom;
+pub fn get_window_name<C: Connection>(
+    conn: &C,
+    window: Window,
+    atoms: &AtomCollection,
+) -> Result<String> {
     let ret = conn
-        .get_property(false, window, atom_property_a, 0u32, 0, 0xFFFF)
+        .get_property(false, window, atoms._NET_WM_NAME, 0u32, 0, 0xFFFF)
         .context("Error in get_property")?
         .reply()
         .context("Error in get_property reply")?;
@@ -709,6 +723,11 @@ pub fn init_x11rb(
         sleep(Duration::from_millis(100));
     }?;
 
+    let atoms = AtomCollection::new(&conn)
+        .context("Error in intern_atom")?
+        .reply()
+        .context("Error in intern_atom reply")?;
+
     conn.extension_information(shm::X11_EXTENSION_NAME)
         .context("Error in get shm extension")?
         .context("Shm must be supported")?;
@@ -810,7 +829,7 @@ pub fn init_x11rb(
         if known_windows.contains(&target_window) {
             continue;
         }
-        let area = init_area(&conn, root, target_window).context("Error in init_area")?;
+        let area = init_area(&conn, root, target_window, &atoms).context("Error in init_area")?;
         if area.size.0 > 1 && area.size.1 > 1 {
             known_windows.insert(area.drawable);
             areas.insert(index, area);
@@ -829,7 +848,8 @@ pub fn init_x11rb(
             if let Ok(attributes) = reply.reply() {
                 trace!("    Attr: {:?}", attributes);
                 if attributes.map_state == MapState::VIEWABLE && attributes.map_is_installed {
-                    let area = init_area(&conn, root, window).context("Error in init_area")?;
+                    let area =
+                        init_area(&conn, root, window, &atoms).context("Error in init_area")?;
                     known_windows.insert(area.drawable);
                     areas.insert(index, area);
                     index += 1;
@@ -924,6 +944,7 @@ pub fn init_x11rb(
 
     let server = ServerX11 {
         conn,
+        atoms,
         max_stall_img: config.video.max_stall_img,
         areas,
         apps: app_list,
@@ -1021,7 +1042,7 @@ fn create_area(server: &mut ServerX11, root: Window, window: Window) -> bool {
         return false;
     }
 
-    if let Ok(area) = init_area(&server.conn, root, window) {
+    if let Ok(area) = init_area(&server.conn, root, window, &server.atoms) {
         // find first free id, insert area
         for index in 0.. {
             if server.areas.get(&index).is_none() {
@@ -1606,13 +1627,7 @@ impl Server for ServerX11 {
     }
 
     fn activate_window(&self, win_id: u32) -> Result<()> {
-        let atom_string_active = self
-            .conn
-            .intern_atom(false, b"_NET_ACTIVE_WINDOW")
-            .context("Error in intern_atom")?
-            .reply()
-            .context("Error in intern_atom reply")?;
-        let atom_active_a: Atom = atom_string_active.atom;
+        let atom_active_a = self.atoms._NET_ACTIVE_WINDOW;
 
         if let Some(area) = self.areas.get(&(win_id as usize)) {
             if let Ok(client_list) = get_client_list(&self.conn, self.root) {
