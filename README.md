@@ -18,3 +18,17 @@ This repository contains:
 - build: docker scripts to build sanzu packages for several distributions
 
 Here is the README which explains how to run the client/server manually: [Sanzu Readme](sanzu/README.md)
+
+Here are some examples: In this case, the remote sanzu server runs under a linux system. Example configuration:
+- compression: h264_qsv (intel)
+- ffmpeg target bandwidth: 2000000 bits/s
+- format: nv12 (yuv420)
+- preset: veryfast
+
+Screenshots are in PNG to show original compression details.
+
+Sanzu client running in seamless mode under windows (both windows are from the remote server)
+![Alt text](misc/screenshot/sanzu_windows.png?raw=true "Sanzu client running in seamless mode under windows")
+
+Sanzu client running in seamless mode under linux (both windows are from the remote server)
+![Alt text](misc/screenshot/sanzu_linux.png?raw=true "Sanzu client running in seamless mode under linux")
