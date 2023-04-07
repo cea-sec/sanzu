@@ -22,7 +22,6 @@ use x11_clipboard::Clipboard;
 use x11rb::{
     connection::{Connection, RequestConnection},
     protocol::{
-        bigreq::{self, ConnectionExt as _},
         randr::{self, ConnectionExt as _},
         shape::{self, ConnectionExt as _},
         shm::{self, ConnectionExt as _},
@@ -56,18 +55,6 @@ fn check_shm_version<C: Connection>(conn: &C) -> Result<(u16, u16)> {
         .reply()
         .context("Error in query shm version reply")?;
     Ok((shm_version.major_version, shm_version.minor_version))
-}
-
-/// Enable Big Request for 4k resolutions and more
-fn enable_big_request<C: Connection>(conn: &C) -> Result<usize> {
-    conn.extension_information(bigreq::X11_EXTENSION_NAME)?;
-
-    let response = conn
-        .bigreq_enable()
-        .context("Error in bigreq test")?
-        .reply()
-        .context("Error in bigreq reply")?;
-    Ok(response.maximum_request_length as usize * 4)
 }
 
 /// Holds information on the local client graphic window
@@ -304,8 +291,7 @@ pub fn init_x11rb(
     }
 
     /* Enable big request for 4k and more */
-    let max_request_size =
-        enable_big_request(&conn).context("Error in activate big request extension")?;
+    let max_request_size = conn.maximum_request_bytes();
     debug!("Max request size: {:?}", max_request_size);
 
     /* Load shape extension */
