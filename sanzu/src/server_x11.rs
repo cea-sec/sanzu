@@ -1237,7 +1237,6 @@ impl Server for ServerX11 {
         self.img_count += 1;
         self.modified_img = false;
         self.modified_area = false;
-        let mut last_clipboard = None;
         let mut events = vec![];
 
         self.conn.flush().context("Cannot flush")?;
@@ -1362,13 +1361,10 @@ impl Server for ServerX11 {
         /* Get clipboard events */
         if let Some(data) = get_clipboard_events(&self.clipboard_event_receiver) {
             let eventclipboard = tunnel::EventClipboard { data };
-            last_clipboard = Some(tunnel::MessageSrv {
+            let clipboard = tunnel::MessageSrv {
                 msg: Some(tunnel::message_srv::Msg::Clipboard(eventclipboard)),
-            });
-        }
-
-        if let Some(last_clipboard) = last_clipboard {
-            events.push(last_clipboard);
+            };
+            events.push(clipboard);
         }
 
         if self.modified_img {
