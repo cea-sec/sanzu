@@ -706,7 +706,7 @@ pub fn init_x11rb(
         {
             break Ok((conn, screen_num));
         }
-        sleep(Duration::new(0, 100_000_000));
+        sleep(Duration::from_millis(100));
     }?;
 
     conn.extension_information(shm::X11_EXTENSION_NAME)
