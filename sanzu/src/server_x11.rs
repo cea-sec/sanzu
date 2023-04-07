@@ -721,8 +721,6 @@ pub fn init_x11rb(
     let setup = conn.setup();
     let screen = &setup.roots[screen_num];
 
-    conn.flush().context("Error in x11rb flush")?;
-
     /* Randr */
 
     /* randr extension to detect screen resolution changes */
