@@ -399,7 +399,9 @@ pub fn init_x11rb(
 
 /// Set the client image to `img`, with a size of `width`x`height`x4 (32bpp) in 24bpp (rgb)
 fn put_frame(client_info: &mut ClientInfo, img: &[u8], width: u32, height: u32) -> Result<()> {
-    if img.len() < client_info.max_request_size {
+    // The extra size of a PutImage request in addition to the actual payload.
+    let put_image_overhead = 28;
+    if img.len() < client_info.max_request_size - put_image_overhead {
         client_info
             .conn
             .put_image(
@@ -419,7 +421,7 @@ fn put_frame(client_info: &mut ClientInfo, img: &[u8], width: u32, height: u32) 
         // Our image is bigger than the x11 max request size;
         // Split it into chunks with a size below this limit
         let round_size = 0x10000_usize - 1_usize;
-        let max_size = client_info.max_request_size & (!round_size);
+        let max_size = (client_info.max_request_size - put_image_overhead) & (!round_size);
         let max_lines = max_size / (4_usize * width as usize);
         let mut lines_rem = height as usize;
         let mut cur_line = 0_usize;
