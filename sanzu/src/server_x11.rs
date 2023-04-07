@@ -59,7 +59,7 @@ use x11rb::{
 /// Holds information on a server side window.
 ///
 /// TODO: for now, we only support rectangle windows.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Area {
     pub drawable: Window,
     pub position: (i16, i16),
@@ -68,8 +68,6 @@ pub struct Area {
     pub is_app: bool,
     pub name: String,
 }
-
-impl Eq for Area {}
 
 impl Ord for Area {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -98,41 +96,9 @@ impl Ord for Area {
     }
 }
 
-impl PartialEq for Area {
-    fn eq(&self, other: &Self) -> bool {
-        self.drawable == other.drawable
-            && self.position == other.position
-            && self.size == other.size
-            && self.mapped == other.mapped
-            && self.is_app == other.is_app
-            && self.name == other.name
-    }
-}
-
 impl PartialOrd for Area {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let ret = self.drawable.partial_cmp(&other.drawable);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-
-        let ret = self.size.partial_cmp(&other.size);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.position.partial_cmp(&other.position);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.mapped.partial_cmp(&other.mapped);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.is_app.partial_cmp(&other.is_app);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        self.name.partial_cmp(&other.name)
+        Some(self.cmp(other))
     }
 }
 
