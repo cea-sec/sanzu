@@ -7,7 +7,7 @@ use crate::{
     video_encoder::{Encoder, EncoderTimings},
 };
 use anyhow::{Context, Result};
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
+use byteorder::{ByteOrder, LittleEndian};
 #[cfg(feature = "notify")]
 use dbus::channel::MatchingReceiver;
 use encoding_rs::mem::decode_latin1;
@@ -21,7 +21,7 @@ use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
     fs::{self, OpenOptions},
-    io::{Cursor, Write},
+    io::Write,
     ptr::null_mut,
     sync::{
         mpsc::{channel, Receiver},
@@ -52,14 +52,23 @@ use x11rb::{
         xtest::ConnectionExt as ConnectionExtXTest,
         Event,
     },
-    rust_connection::{DefaultStream, RustConnection},
+    rust_connection::RustConnection,
     COPY_DEPTH_FROM_PARENT,
 };
+
+x11rb::atom_manager! {
+    pub AtomCollection: AtomCollectionCookie {
+        _NET_CLIENT_LIST,
+        _NET_WM_STATE,
+        _NET_WM_NAME,
+        _NET_ACTIVE_WINDOW,
+    }
+}
 
 /// Holds information on a server side window.
 ///
 /// TODO: for now, we only support rectangle windows.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Area {
     pub drawable: Window,
     pub position: (i16, i16),
@@ -68,8 +77,6 @@ pub struct Area {
     pub is_app: bool,
     pub name: String,
 }
-
-impl Eq for Area {}
 
 impl Ord for Area {
     fn cmp(&self, other: &Self) -> Ordering {
@@ -98,41 +105,9 @@ impl Ord for Area {
     }
 }
 
-impl PartialEq for Area {
-    fn eq(&self, other: &Self) -> bool {
-        self.drawable == other.drawable
-            && self.position == other.position
-            && self.size == other.size
-            && self.mapped == other.mapped
-            && self.is_app == other.is_app
-            && self.name == other.name
-    }
-}
-
 impl PartialOrd for Area {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let ret = self.drawable.partial_cmp(&other.drawable);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-
-        let ret = self.size.partial_cmp(&other.size);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.position.partial_cmp(&other.position);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.mapped.partial_cmp(&other.mapped);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.is_app.partial_cmp(&other.is_app);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        self.name.partial_cmp(&other.name)
+        Some(self.cmp(other))
     }
 }
 
@@ -294,7 +269,12 @@ fn init_grab<C: Connection>(
 }
 
 /// Creates Area linked to a `window`
-pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Result<Area> {
+pub fn init_area<C: Connection>(
+    conn: &C,
+    root: Window,
+    window: Window,
+    atoms: &AtomCollection,
+) -> Result<Area> {
     let geometry = conn
         .get_geometry(window)
         .context("Error in get geometry")?
@@ -318,7 +298,7 @@ pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Resul
 
         for child in windows_children.iter() {
             if app_list.contains(child) {
-                if let Ok(name) = get_window_name(conn, *child) {
+                if let Ok(name) = get_window_name(conn, *child, atoms) {
                     app_name = name;
                 }
                 trace!("child {:x}: {}", *child, app_name);
@@ -344,7 +324,9 @@ pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Resul
 /// Holds information on the server
 pub struct ServerX11 {
     /// x11 connection handle
-    pub conn: RustConnection<DefaultStream>,
+    pub conn: RustConnection,
+    /// x11 atoms
+    atoms: AtomCollection,
     /// x11 graphic information
     pub grabinfo: GrabInfo,
     /// Frame rate limit (see config)
@@ -395,73 +377,50 @@ pub struct ServerX11 {
     pub dbus_printfile_receiver: Receiver<PrintFile>,
 }
 
-/// Retrieve the x11 windows information
-pub fn get_client_list<C: Connection>(conn: &C, root: Window) -> Result<Vec<Window>> {
-    let atom_string_target = conn
-        .intern_atom(false, b"_NET_CLIENT_LIST")
+fn get_property32<C: Connection>(
+    conn: &C,
+    window: Window,
+    property: &[u8],
+    kind: impl Into<u32>,
+) -> Result<Vec<u32>> {
+    let atom_property = conn
+        .intern_atom(false, property)
         .context("Error in intern_atom")?
         .reply()
-        .context("Error in intern_atom reply")?;
-    let atom_property_a: Atom = atom_string_target.atom;
+        .context("Error in intern_atom reply")?
+        .atom;
     let ret = conn
-        .get_property(false, root, atom_property_a, AtomEnum::WINDOW, 0, 0xFFFF)
+        .get_property(false, window, atom_property, kind.into(), 0, 0xFFFF)
         .context("Error in get_property")?
         .reply()
         .context("Error in get_property reply")?;
 
-    let mut windows = vec![];
-    for data in ret.value.chunks(4) {
-        let value: &[u8] = data;
-        let mut rdr = Cursor::new(value);
-        let window: u32 = rdr
-            .read_u32::<LittleEndian>()
-            .context("Error in read_u32")?;
-        windows.push(window as Window);
-    }
-    Ok(windows)
+    let values = ret
+        .value32()
+        .context("Incorrect format in GetProperty reply")?;
+    Ok(values.collect())
+}
+
+/// Retrieve the x11 windows information
+pub fn get_client_list<C: Connection>(conn: &C, root: Window) -> Result<Vec<Window>> {
+    get_property32(conn, root, b"_NET_CLIENT_LIST", AtomEnum::WINDOW)
 }
 
 pub fn get_window_state<C: Connection>(conn: &C, window: Window) -> Result<Vec<Window>> {
-    let atom_string_target = conn
-        .intern_atom(false, b"_NET_WM_STATE")
-        .context("Error in intern_atom")?
-        .reply()
-        .context("Error in intern_atom reply")?;
-    let atom_property_a: Atom = atom_string_target.atom;
-    let ret = conn
-        .get_property(false, window, atom_property_a, AtomEnum::ATOM, 0, 0xFFFF)
-        .context("Error in get_property")?
-        .reply()
-        .context("Error in get_property reply")?;
-
-    let mut states = vec![];
-    for data in ret.value.chunks(4) {
-        let value: &[u8] = data;
-        let mut rdr = Cursor::new(value);
-        let window: u32 = rdr
-            .read_u32::<LittleEndian>()
-            .context("Error in read_u32")?;
-        states.push(window as Window);
-    }
-    Ok(states)
+    get_property32(conn, window, b"_NET_WM_STATE", AtomEnum::ATOM)
 }
 
-pub fn get_window_name<C: Connection>(conn: &C, window: Window) -> Result<String> {
-    let atom_string_target = conn
-        .intern_atom(false, b"_NET_WM_NAME")
-        .context("Error in intern_atom")?
-        .reply()
-        .context("Error in intern_atom reply")?;
-    let atom_property_a: Atom = atom_string_target.atom;
+pub fn get_window_name<C: Connection>(
+    conn: &C,
+    window: Window,
+    atoms: &AtomCollection,
+) -> Result<String> {
     let ret = conn
-        .get_property(false, window, atom_property_a, 0u32, 0, 0xFFFF)
+        .get_property(false, window, atoms._NET_WM_NAME, 0u32, 0, 0xFFFF)
         .context("Error in get_property")?
         .reply()
         .context("Error in get_property reply")?;
-    let value: String = match std::str::from_utf8(&ret.value) {
-        Ok(value) => value.into(),
-        Err(_) => decode_latin1(&ret.value).into(),
-    };
+    let value = String::from_utf8(ret.value).unwrap_or_else(|e| decode_latin1(e.as_bytes()).into());
     Ok(value)
 }
 
@@ -761,8 +720,13 @@ pub fn init_x11rb(
         {
             break Ok((conn, screen_num));
         }
-        sleep(Duration::new(0, 100_000_000));
+        sleep(Duration::from_millis(100));
     }?;
+
+    let atoms = AtomCollection::new(&conn)
+        .context("Error in intern_atom")?
+        .reply()
+        .context("Error in intern_atom reply")?;
 
     conn.extension_information(shm::X11_EXTENSION_NAME)
         .context("Error in get shm extension")?
@@ -775,8 +739,6 @@ pub fn init_x11rb(
 
     let setup = conn.setup();
     let screen = &setup.roots[screen_num];
-
-    conn.flush().context("Error in x11rb flush")?;
 
     /* Randr */
 
@@ -867,7 +829,7 @@ pub fn init_x11rb(
         if known_windows.contains(&target_window) {
             continue;
         }
-        let area = init_area(&conn, root, target_window).context("Error in init_area")?;
+        let area = init_area(&conn, root, target_window, &atoms).context("Error in init_area")?;
         if area.size.0 > 1 && area.size.1 > 1 {
             known_windows.insert(area.drawable);
             areas.insert(index, area);
@@ -886,7 +848,8 @@ pub fn init_x11rb(
             if let Ok(attributes) = reply.reply() {
                 trace!("    Attr: {:?}", attributes);
                 if attributes.map_state == MapState::VIEWABLE && attributes.map_is_installed {
-                    let area = init_area(&conn, root, window).context("Error in init_area")?;
+                    let area =
+                        init_area(&conn, root, window, &atoms).context("Error in init_area")?;
                     known_windows.insert(area.drawable);
                     areas.insert(index, area);
                     index += 1;
@@ -981,6 +944,7 @@ pub fn init_x11rb(
 
     let server = ServerX11 {
         conn,
+        atoms,
         max_stall_img: config.video.max_stall_img,
         areas,
         apps: app_list,
@@ -1078,7 +1042,7 @@ fn create_area(server: &mut ServerX11, root: Window, window: Window) -> bool {
         return false;
     }
 
-    if let Ok(area) = init_area(&server.conn, root, window) {
+    if let Ok(area) = init_area(&server.conn, root, window, &server.atoms) {
         // find first free id, insert area
         for index in 0.. {
             if server.areas.get(&index).is_none() {
@@ -1182,11 +1146,6 @@ impl Server for ServerX11 {
                 .context("Error in shm_get_image")?
                 .reply()
                 .context("Error in shm_get_image reply")?;
-
-            if let Err(err) = self.conn.flush() {
-                error!("Connection error {:?}", err);
-                return Err(anyhow!("Connection error"));
-            }
         }
 
         Ok(())
@@ -1299,7 +1258,6 @@ impl Server for ServerX11 {
         self.img_count += 1;
         self.modified_img = false;
         self.modified_area = false;
-        let mut last_clipboard = None;
         let mut events = vec![];
 
         self.conn.flush().context("Cannot flush")?;
@@ -1424,13 +1382,10 @@ impl Server for ServerX11 {
         /* Get clipboard events */
         if let Some(data) = get_clipboard_events(&self.clipboard_event_receiver) {
             let eventclipboard = tunnel::EventClipboard { data };
-            last_clipboard = Some(tunnel::MessageSrv {
+            let clipboard = tunnel::MessageSrv {
                 msg: Some(tunnel::message_srv::Msg::Clipboard(eventclipboard)),
-            });
-        }
-
-        if let Some(last_clipboard) = last_clipboard {
-            events.push(last_clipboard);
+            };
+            events.push(clipboard);
         }
 
         if self.modified_img {
@@ -1672,13 +1627,7 @@ impl Server for ServerX11 {
     }
 
     fn activate_window(&self, win_id: u32) -> Result<()> {
-        let atom_string_active = self
-            .conn
-            .intern_atom(false, b"_NET_ACTIVE_WINDOW")
-            .context("Error in intern_atom")?
-            .reply()
-            .context("Error in intern_atom reply")?;
-        let atom_active_a: Atom = atom_string_active.atom;
+        let atom_active_a = self.atoms._NET_ACTIVE_WINDOW;
 
         if let Some(area) = self.areas.get(&(win_id as usize)) {
             if let Ok(client_list) = get_client_list(&self.conn, self.root) {

@@ -22,7 +22,6 @@ use x11_clipboard::Clipboard;
 use x11rb::{
     connection::{Connection, RequestConnection},
     protocol::{
-        bigreq::{self, ConnectionExt as _},
         randr::{self, ConnectionExt as _},
         shape::{self, ConnectionExt as _},
         shm::{self, ConnectionExt as _},
@@ -31,7 +30,7 @@ use x11rb::{
         xproto::*,
         Event,
     },
-    rust_connection::{DefaultStream, RustConnection},
+    rust_connection::RustConnection,
     wrapper::ConnectionExt as _,
     COPY_DEPTH_FROM_PARENT,
 };
@@ -43,19 +42,6 @@ const KEY_ALT: usize = 64;
 const KEY_S: usize = 39;
 const KEY_C: usize = 54;
 const KEY_H: usize = 43;
-
-struct FreePixmap<'c, C: Connection>(&'c C, Pixmap);
-impl<C: Connection> Drop for FreePixmap<'_, C> {
-    fn drop(&mut self) {
-        self.0.free_pixmap(self.1).unwrap();
-    }
-}
-struct FreeGC<'c, C: Connection>(&'c C, Gcontext);
-impl<C: Connection> Drop for FreeGC<'_, C> {
-    fn drop(&mut self) {
-        self.0.free_gc(self.1).unwrap();
-    }
-}
 
 /// Get the supported SHM version from the X11 server
 fn check_shm_version<C: Connection>(conn: &C) -> Result<(u16, u16)> {
@@ -71,18 +57,6 @@ fn check_shm_version<C: Connection>(conn: &C) -> Result<(u16, u16)> {
     Ok((shm_version.major_version, shm_version.minor_version))
 }
 
-/// Enable Big Request for 4k resolutions and more
-fn enable_big_request<C: Connection>(conn: &C) -> Result<usize> {
-    conn.extension_information(bigreq::X11_EXTENSION_NAME)?;
-
-    let response = conn
-        .bigreq_enable()
-        .context("Error in bigreq test")?
-        .reply()
-        .context("Error in bigreq reply")?;
-    Ok(response.maximum_request_length as usize * 4)
-}
-
 /// Holds information on the local client graphic window
 pub struct WindowInfo {
     /// x11rb window handle
@@ -96,7 +70,7 @@ pub struct WindowInfo {
 /// Holds information on the local client
 pub struct ClientInfo {
     /// x11rb connection
-    pub conn: RustConnection<DefaultStream>,
+    pub conn: RustConnection,
     pub root: u32,
     /// Max request size for x11
     pub max_request_size: usize,
@@ -317,8 +291,7 @@ pub fn init_x11rb(
     }
 
     /* Enable big request for 4k and more */
-    let max_request_size =
-        enable_big_request(&conn).context("Error in activate big request extension")?;
+    let max_request_size = conn.maximum_request_bytes();
     debug!("Max request size: {:?}", max_request_size);
 
     /* Load shape extension */
@@ -426,7 +399,9 @@ pub fn init_x11rb(
 
 /// Set the client image to `img`, with a size of `width`x`height`x4 (32bpp) in 24bpp (rgb)
 fn put_frame(client_info: &mut ClientInfo, img: &[u8], width: u32, height: u32) -> Result<()> {
-    if img.len() < client_info.max_request_size {
+    // The extra size of a PutImage request in addition to the actual payload.
+    let put_image_overhead = 28;
+    if img.len() < client_info.max_request_size - put_image_overhead {
         client_info
             .conn
             .put_image(
@@ -446,7 +421,7 @@ fn put_frame(client_info: &mut ClientInfo, img: &[u8], width: u32, height: u32) 
         // Our image is bigger than the x11 max request size;
         // Split it into chunks with a size below this limit
         let round_size = 0x10000_usize - 1_usize;
-        let max_size = client_info.max_request_size & (!round_size);
+        let max_size = (client_info.max_request_size - put_image_overhead) & (!round_size);
         let max_lines = max_size / (4_usize * width as usize);
         let mut lines_rem = height as usize;
         let mut cur_line = 0_usize;
@@ -658,48 +633,36 @@ impl Client for ClientInfo {
             .generate_id()
             .context("Error in x11rb generate_id")?;
 
-        let pixmap_data = self
-            .conn
-            .generate_id()
-            .context("Error in x11rb generate_id")?;
-        let pixmap_mask = self
-            .conn
-            .generate_id()
-            .context("Error in x11rb generate_id")?;
-
         // TODO XXX: the client support only 1 bit cursor for now
-        let pixmap_data = FreePixmap(&self.conn, pixmap_data);
-        let pixmap_mask = FreePixmap(&self.conn, pixmap_mask);
-
-        self.conn
-            .create_pixmap(
-                1,
-                pixmap_data.1,
-                self.window_info.window,
-                size.0 as u16,
-                size.1 as u16,
-            )
-            .context("Error in create_pixmap")?
+        let (pixmap_data, pixmap_data_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
+            &self.conn,
+            1,
+            self.window_info.window,
+            size.0 as u16,
+            size.1 as u16,
+        )
+        .context("Error in create_pixmap")?;
+        let (pixmap_mask, pixmap_mask_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
+            &self.conn,
+            1,
+            self.window_info.window,
+            size.0 as u16,
+            size.1 as u16,
+        )
+        .context("Error in create_pixmap")?;
+        pixmap_data_cookie
+            .check()
+            .context("Error in create_pixmap check")?;
+        pixmap_mask_cookie
             .check()
             .context("Error in create_pixmap check")?;
 
-        self.conn
-            .create_pixmap(
-                1,
-                pixmap_mask.1,
-                self.window_info.window,
-                size.0 as u16,
-                size.1 as u16,
-            )
-            .context("Error in create_pixmap")?
-            .check()
-            .context("Error in create_pixmap check")?;
-
-        let black_gc = create_gc(&self.conn, pixmap_data.1, 0, 0).context("Error in create_gc")?;
+        let black_gc =
+            create_gc(&self.conn, pixmap_data.pixmap(), 0, 0).context("Error in create_gc")?;
         let white_gc =
-            create_gc(&self.conn, pixmap_data.1, 0x1, 0x1).context("Error in create_gc")?;
-        let black_gc = FreeGC(&self.conn, black_gc);
-        let white_gc = FreeGC(&self.conn, white_gc);
+            create_gc(&self.conn, pixmap_data.pixmap(), 0x1, 0x1).context("Error in create_gc")?;
+        let black_gc = GcontextWrapper::for_gcontext(&self.conn, black_gc);
+        let white_gc = GcontextWrapper::for_gcontext(&self.conn, white_gc);
 
         let mut pixels_white = vec![];
         let mut pixels_black = vec![];
@@ -732,17 +695,32 @@ impl Client for ClientInfo {
             }
         }
         self.conn
-            .poly_point(CoordMode::ORIGIN, pixmap_data.1, white_gc.1, &pixels_white)
+            .poly_point(
+                CoordMode::ORIGIN,
+                pixmap_data.pixmap(),
+                white_gc.gcontext(),
+                &pixels_white,
+            )
             .context("Error in poly_point")?
             .check()
             .context("Error in poly_point check")?;
         self.conn
-            .poly_point(CoordMode::ORIGIN, pixmap_data.1, black_gc.1, &pixels_black)
+            .poly_point(
+                CoordMode::ORIGIN,
+                pixmap_data.pixmap(),
+                black_gc.gcontext(),
+                &pixels_black,
+            )
             .context("Error in poly_point")?
             .check()
             .context("Error in poly_point check")?;
         self.conn
-            .poly_point(CoordMode::ORIGIN, pixmap_mask.1, white_gc.1, &pixels_mask)
+            .poly_point(
+                CoordMode::ORIGIN,
+                pixmap_mask.pixmap(),
+                white_gc.gcontext(),
+                &pixels_mask,
+            )
             .context("Error in poly_point")?
             .check()
             .context("Error in poly_point check")?;
@@ -756,8 +734,8 @@ impl Client for ClientInfo {
         self.conn
             .create_cursor(
                 cid,
-                pixmap_data.1,
-                pixmap_mask.1,
+                pixmap_data.pixmap(),
+                pixmap_mask.pixmap(),
                 0xffff,
                 0xffff,
                 0xffff,
@@ -1057,12 +1035,8 @@ impl Client for ClientInfo {
             self.clipboard_last_value = Some(data);
         }
 
-        if let Some(last_move) = last_move {
-            events.push(last_move);
-        }
-        if let Some(last_resize) = last_resize {
-            events.push(last_resize);
-        }
+        events.extend(last_move);
+        events.extend(last_resize);
 
         match self.clipboard_config {
             ClipboardConfig::Deny => {}
