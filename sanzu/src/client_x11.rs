@@ -31,7 +31,7 @@ use x11rb::{
         xproto::*,
         Event,
     },
-    rust_connection::{DefaultStream, RustConnection},
+    rust_connection::RustConnection,
     wrapper::ConnectionExt as _,
     COPY_DEPTH_FROM_PARENT,
 };
@@ -96,7 +96,7 @@ pub struct WindowInfo {
 /// Holds information on the local client
 pub struct ClientInfo {
     /// x11rb connection
-    pub conn: RustConnection<DefaultStream>,
+    pub conn: RustConnection,
     pub root: u32,
     /// Max request size for x11
     pub max_request_size: usize,

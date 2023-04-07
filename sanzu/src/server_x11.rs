@@ -52,7 +52,7 @@ use x11rb::{
         xtest::ConnectionExt as ConnectionExtXTest,
         Event,
     },
-    rust_connection::{DefaultStream, RustConnection},
+    rust_connection::RustConnection,
     COPY_DEPTH_FROM_PARENT,
 };
 
@@ -344,7 +344,7 @@ pub fn init_area<C: Connection>(conn: &C, root: Window, window: Window) -> Resul
 /// Holds information on the server
 pub struct ServerX11 {
     /// x11 connection handle
-    pub conn: RustConnection<DefaultStream>,
+    pub conn: RustConnection,
     /// x11 graphic information
     pub grabinfo: GrabInfo,
     /// Frame rate limit (see config)
