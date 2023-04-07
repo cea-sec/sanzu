@@ -1035,12 +1035,8 @@ impl Client for ClientInfo {
             self.clipboard_last_value = Some(data);
         }
 
-        if let Some(last_move) = last_move {
-            events.push(last_move);
-        }
-        if let Some(last_resize) = last_resize {
-            events.push(last_resize);
-        }
+        events.extend(last_move);
+        events.extend(last_resize);
 
         match self.clipboard_config {
             ClipboardConfig::Deny => {}
