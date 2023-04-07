@@ -7,7 +7,7 @@ use crate::{
     video_encoder::{Encoder, EncoderTimings},
 };
 use anyhow::{Context, Result};
-use byteorder::{ByteOrder, LittleEndian, ReadBytesExt};
+use byteorder::{ByteOrder, LittleEndian};
 #[cfg(feature = "notify")]
 use dbus::channel::MatchingReceiver;
 use encoding_rs::mem::decode_latin1;
@@ -21,7 +21,7 @@ use std::{
     cmp::Ordering,
     collections::{HashMap, HashSet},
     fs::{self, OpenOptions},
-    io::{Cursor, Write},
+    io::Write,
     ptr::null_mut,
     sync::{
         mpsc::{channel, Receiver},
@@ -361,55 +361,37 @@ pub struct ServerX11 {
     pub dbus_printfile_receiver: Receiver<PrintFile>,
 }
 
-/// Retrieve the x11 windows information
-pub fn get_client_list<C: Connection>(conn: &C, root: Window) -> Result<Vec<Window>> {
-    let atom_string_target = conn
-        .intern_atom(false, b"_NET_CLIENT_LIST")
+fn get_property32<C: Connection>(
+    conn: &C,
+    window: Window,
+    property: &[u8],
+    kind: impl Into<u32>,
+) -> Result<Vec<u32>> {
+    let atom_property = conn
+        .intern_atom(false, property)
         .context("Error in intern_atom")?
         .reply()
-        .context("Error in intern_atom reply")?;
-    let atom_property_a: Atom = atom_string_target.atom;
+        .context("Error in intern_atom reply")?
+        .atom;
     let ret = conn
-        .get_property(false, root, atom_property_a, AtomEnum::WINDOW, 0, 0xFFFF)
+        .get_property(false, window, atom_property, kind.into(), 0, 0xFFFF)
         .context("Error in get_property")?
         .reply()
         .context("Error in get_property reply")?;
 
-    let mut windows = vec![];
-    for data in ret.value.chunks(4) {
-        let value: &[u8] = data;
-        let mut rdr = Cursor::new(value);
-        let window: u32 = rdr
-            .read_u32::<LittleEndian>()
-            .context("Error in read_u32")?;
-        windows.push(window as Window);
-    }
-    Ok(windows)
+    let values = ret
+        .value32()
+        .context("Incorrect format in GetProperty reply")?;
+    Ok(values.collect())
+}
+
+/// Retrieve the x11 windows information
+pub fn get_client_list<C: Connection>(conn: &C, root: Window) -> Result<Vec<Window>> {
+    get_property32(conn, root, b"_NET_CLIENT_LIST", AtomEnum::WINDOW)
 }
 
 pub fn get_window_state<C: Connection>(conn: &C, window: Window) -> Result<Vec<Window>> {
-    let atom_string_target = conn
-        .intern_atom(false, b"_NET_WM_STATE")
-        .context("Error in intern_atom")?
-        .reply()
-        .context("Error in intern_atom reply")?;
-    let atom_property_a: Atom = atom_string_target.atom;
-    let ret = conn
-        .get_property(false, window, atom_property_a, AtomEnum::ATOM, 0, 0xFFFF)
-        .context("Error in get_property")?
-        .reply()
-        .context("Error in get_property reply")?;
-
-    let mut states = vec![];
-    for data in ret.value.chunks(4) {
-        let value: &[u8] = data;
-        let mut rdr = Cursor::new(value);
-        let window: u32 = rdr
-            .read_u32::<LittleEndian>()
-            .context("Error in read_u32")?;
-        states.push(window as Window);
-    }
-    Ok(states)
+    get_property32(conn, window, b"_NET_WM_STATE", AtomEnum::ATOM)
 }
 
 pub fn get_window_name<C: Connection>(conn: &C, window: Window) -> Result<String> {
@@ -424,10 +406,7 @@ pub fn get_window_name<C: Connection>(conn: &C, window: Window) -> Result<String
         .context("Error in get_property")?
         .reply()
         .context("Error in get_property reply")?;
-    let value: String = match std::str::from_utf8(&ret.value) {
-        Ok(value) => value.into(),
-        Err(_) => decode_latin1(&ret.value).into(),
-    };
+    let value = String::from_utf8(ret.value).unwrap_or_else(|e| decode_latin1(e.as_bytes()).into());
     Ok(value)
 }
 
