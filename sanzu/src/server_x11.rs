@@ -1125,11 +1125,6 @@ impl Server for ServerX11 {
                 .context("Error in shm_get_image")?
                 .reply()
                 .context("Error in shm_get_image reply")?;
-
-            if let Err(err) = self.conn.flush() {
-                error!("Connection error {:?}", err);
-                return Err(anyhow!("Connection error"));
-            }
         }
 
         Ok(())
