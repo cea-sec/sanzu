@@ -44,19 +44,6 @@ const KEY_S: usize = 39;
 const KEY_C: usize = 54;
 const KEY_H: usize = 43;
 
-struct FreePixmap<'c, C: Connection>(&'c C, Pixmap);
-impl<C: Connection> Drop for FreePixmap<'_, C> {
-    fn drop(&mut self) {
-        self.0.free_pixmap(self.1).unwrap();
-    }
-}
-struct FreeGC<'c, C: Connection>(&'c C, Gcontext);
-impl<C: Connection> Drop for FreeGC<'_, C> {
-    fn drop(&mut self) {
-        self.0.free_gc(self.1).unwrap();
-    }
-}
-
 /// Get the supported SHM version from the X11 server
 fn check_shm_version<C: Connection>(conn: &C) -> Result<(u16, u16)> {
     conn.extension_information(shm::X11_EXTENSION_NAME)
@@ -658,48 +645,36 @@ impl Client for ClientInfo {
             .generate_id()
             .context("Error in x11rb generate_id")?;
 
-        let pixmap_data = self
-            .conn
-            .generate_id()
-            .context("Error in x11rb generate_id")?;
-        let pixmap_mask = self
-            .conn
-            .generate_id()
-            .context("Error in x11rb generate_id")?;
-
         // TODO XXX: the client support only 1 bit cursor for now
-        let pixmap_data = FreePixmap(&self.conn, pixmap_data);
-        let pixmap_mask = FreePixmap(&self.conn, pixmap_mask);
-
-        self.conn
-            .create_pixmap(
-                1,
-                pixmap_data.1,
-                self.window_info.window,
-                size.0 as u16,
-                size.1 as u16,
-            )
-            .context("Error in create_pixmap")?
+        let (pixmap_data, pixmap_data_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
+            &self.conn,
+            1,
+            self.window_info.window,
+            size.0 as u16,
+            size.1 as u16,
+        )
+        .context("Error in create_pixmap")?;
+        let (pixmap_mask, pixmap_mask_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
+            &self.conn,
+            1,
+            self.window_info.window,
+            size.0 as u16,
+            size.1 as u16,
+        )
+        .context("Error in create_pixmap")?;
+        pixmap_data_cookie
+            .check()
+            .context("Error in create_pixmap check")?;
+        pixmap_mask_cookie
             .check()
             .context("Error in create_pixmap check")?;
 
-        self.conn
-            .create_pixmap(
-                1,
-                pixmap_mask.1,
-                self.window_info.window,
-                size.0 as u16,
-                size.1 as u16,
-            )
-            .context("Error in create_pixmap")?
-            .check()
-            .context("Error in create_pixmap check")?;
-
-        let black_gc = create_gc(&self.conn, pixmap_data.1, 0, 0).context("Error in create_gc")?;
+        let black_gc =
+            create_gc(&self.conn, pixmap_data.pixmap(), 0, 0).context("Error in create_gc")?;
         let white_gc =
-            create_gc(&self.conn, pixmap_data.1, 0x1, 0x1).context("Error in create_gc")?;
-        let black_gc = FreeGC(&self.conn, black_gc);
-        let white_gc = FreeGC(&self.conn, white_gc);
+            create_gc(&self.conn, pixmap_data.pixmap(), 0x1, 0x1).context("Error in create_gc")?;
+        let black_gc = GcontextWrapper::for_gcontext(&self.conn, black_gc);
+        let white_gc = GcontextWrapper::for_gcontext(&self.conn, white_gc);
 
         let mut pixels_white = vec![];
         let mut pixels_black = vec![];
@@ -732,17 +707,32 @@ impl Client for ClientInfo {
             }
         }
         self.conn
-            .poly_point(CoordMode::ORIGIN, pixmap_data.1, white_gc.1, &pixels_white)
+            .poly_point(
+                CoordMode::ORIGIN,
+                pixmap_data.pixmap(),
+                white_gc.gcontext(),
+                &pixels_white,
+            )
             .context("Error in poly_point")?
             .check()
             .context("Error in poly_point check")?;
         self.conn
-            .poly_point(CoordMode::ORIGIN, pixmap_data.1, black_gc.1, &pixels_black)
+            .poly_point(
+                CoordMode::ORIGIN,
+                pixmap_data.pixmap(),
+                black_gc.gcontext(),
+                &pixels_black,
+            )
             .context("Error in poly_point")?
             .check()
             .context("Error in poly_point check")?;
         self.conn
-            .poly_point(CoordMode::ORIGIN, pixmap_mask.1, white_gc.1, &pixels_mask)
+            .poly_point(
+                CoordMode::ORIGIN,
+                pixmap_mask.pixmap(),
+                white_gc.gcontext(),
+                &pixels_mask,
+            )
             .context("Error in poly_point")?
             .check()
             .context("Error in poly_point check")?;
@@ -756,8 +746,8 @@ impl Client for ClientInfo {
         self.conn
             .create_cursor(
                 cid,
-                pixmap_data.1,
-                pixmap_mask.1,
+                pixmap_data.pixmap(),
+                pixmap_mask.pixmap(),
                 0xffff,
                 0xffff,
                 0xffff,
