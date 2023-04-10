@@ -74,6 +74,15 @@ apt install build-essential cargo libasound2-dev ffmpeg libavutil-dev libclang-d
     libavfilter-dev libavdevice-dev libpam0g-dev libdbus-1-dev
 ```
 
+### Alpine
+Required packages:
+
+```
+apk add cmake g++ ffmpeg protoc ffmpeg-dev x264 \
+    xcb-util linux-pam-dev curl bash \
+    krb5-dev alsa-lib-dev opus-dev clang-dev libx11-dev
+```
+
 ### Archlinux
 Required packages:
 
