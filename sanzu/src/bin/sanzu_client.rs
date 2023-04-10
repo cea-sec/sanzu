@@ -41,7 +41,7 @@ RUST_LOG=info
     }
 
     let command = Command::new("Sanzu client")
-        .version("0.1.0")
+        .version(env!("CARGO_PKG_VERSION"))
         .about(about)
         .arg(
             Arg::new("server_addr")
