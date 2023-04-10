@@ -71,7 +71,7 @@ Packages required:
 apt install build-essential cargo libasound2-dev ffmpeg libavutil-dev libclang-dev \
     libkrb5-dev libx264-dev libx264-dev libxcb-render0-dev libxcb-shape0-dev \
     libxcb-xfixes0-dev libxdamage-dev libxext-dev x264 xcb libavformat-dev \
-    libavfilter-dev libavdevice-dev
+    libavfilter-dev libavdevice-dev libpam0g-dev libdbus-1-dev
 ```
 
 ### Archlinux
@@ -82,11 +82,13 @@ pacman -S rust libxtst libxext ffmpeg libxdamage libxfixes pkgconf clang \
     gcc llvm
 ```
 
-### CentOs
+### Redhat based
 Required packages:
 
 ```
-yum install alsa-lib-devel ffmpeg-devel compat-libxcb
+yum install alsa-lib-devel ffmpeg-devel compat-libxcb gcc-c++ protobuf-compiler \
+    libxcb-devel libX11-devel dbus-devel clang-devel krb5-devel opus-devel \
+    libavdevice pam-devel
 ```
 
 ### Windows cross compilation from archlinux
