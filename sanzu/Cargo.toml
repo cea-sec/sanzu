@@ -8,7 +8,7 @@ description = "Sanzu video server, proxy and client"
 license = "GPL-3.0"
 
 [build-dependencies]
-bindgen = "0.64"
+bindgen = "0.65"
 cc = "1.0"
 winres = {git = "https://github.com/serpilliere/winres", branch="link_resources"}
 
