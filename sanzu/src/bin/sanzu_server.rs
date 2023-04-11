@@ -24,7 +24,7 @@ Protocol version: {VERSION:?}
     );
 
     let matches = Command::new("Sanzu server")
-        .version("0.1.0")
+        .version(env!("CARGO_PKG_VERSION"))
         .about(about)
         .arg(
             Arg::new("config")
