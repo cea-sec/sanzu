@@ -23,6 +23,7 @@ use x11rb::{
     connection::{Connection, RequestConnection},
     protocol::{
         randr::{self, ConnectionExt as _},
+        render,
         shape::{self, ConnectionExt as _},
         shm::{self, ConnectionExt as _},
         xfixes::ConnectionExt as _,
@@ -113,6 +114,8 @@ pub struct ClientInfo {
     pub areas: Vec<(usize, Area)>,
     /// Stores grab_keyboard flag
     pub grab_keyboard: bool,
+    /// Stores bgra format id for cursor picture
+    pub bgra_format_id: u32,
 }
 
 fn create_gc<C: Connection>(
@@ -366,6 +369,34 @@ pub fn init_x11rb(
         .context("Error in create_gc")?;
     let keys_state = vec![false; 0x100];
 
+    // Search for BGRA pixel format
+    let render_pict_format = render::query_pict_formats(&conn)
+        .context("Cannot get pict formats")?
+        .reply()
+        .context("Error in query pict format reply")?;
+
+    let mut bgra_format_id = 0;
+    let bgra_format = render::Directformat {
+        red_shift: 16,
+        red_mask: 255,
+        green_shift: 8,
+        green_mask: 255,
+        blue_shift: 0,
+        blue_mask: 255,
+        alpha_shift: 24,
+        alpha_mask: 255,
+    };
+    for format in render_pict_format.formats.iter() {
+        let direct = format.direct;
+        if format.depth != 32 {
+            continue;
+        }
+        if direct == bgra_format {
+            bgra_format_id = format.id;
+            break;
+        }
+    }
+
     let clipboard = Clipboard::new().context("Error in clipboard creation")?;
     let root = screen.root;
     let client_info = ClientInfo {
@@ -392,6 +423,7 @@ pub fn init_x11rb(
         sync_key_locks_needed: arguments.sync_key_locks,
         areas: vec![],
         grab_keyboard: arguments.grab_keyboard,
+        bgra_format_id,
     };
 
     Ok(Box::new(client_info))
@@ -628,128 +660,53 @@ impl Client for ClientInfo {
     }
 
     fn set_cursor(&mut self, cursor_data: &[u8], size: (u32, u32), hot: (u16, u16)) -> Result<()> {
-        let cid = self
-            .conn
-            .generate_id()
-            .context("Error in x11rb generate_id")?;
-
-        // TODO XXX: the client support only 1 bit cursor for now
-        let (pixmap_data, pixmap_data_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
+        let (pixmap, pixmap_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
             &self.conn,
-            1,
+            32,
             self.window_info.window,
             size.0 as u16,
             size.1 as u16,
         )
         .context("Error in create_pixmap")?;
-        let (pixmap_mask, pixmap_mask_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
+
+        pixmap_cookie
+            .check()
+            .context("Error in create_pixmap check")?;
+
+        let gc = create_gc(&self.conn, pixmap.pixmap(), 0, 0).context("Error in create_gc")?;
+        let gc = GcontextWrapper::for_gcontext(&self.conn, gc);
+
+        let _ = put_image(
             &self.conn,
-            1,
-            self.window_info.window,
-            size.0 as u16,
-            size.1 as u16,
+            ImageFormat::Z_PIXMAP,
+            pixmap.pixmap(),
+            gc.gcontext(),
+            size.0 as _,
+            size.1 as _,
+            0,
+            0,
+            0,
+            32,
+            cursor_data,
         )
-        .context("Error in create_pixmap")?;
-        pixmap_data_cookie
-            .check()
-            .context("Error in create_pixmap check")?;
-        pixmap_mask_cookie
-            .check()
-            .context("Error in create_pixmap check")?;
+        .context("Cannot put image")?;
 
-        let black_gc =
-            create_gc(&self.conn, pixmap_data.pixmap(), 0, 0).context("Error in create_gc")?;
-        let white_gc =
-            create_gc(&self.conn, pixmap_data.pixmap(), 0x1, 0x1).context("Error in create_gc")?;
-        let black_gc = GcontextWrapper::for_gcontext(&self.conn, black_gc);
-        let white_gc = GcontextWrapper::for_gcontext(&self.conn, white_gc);
+        let cursor = self.conn.generate_id().context("Cannot generate id")?;
+        let picture = self.conn.generate_id().context("Cannot generate id")?;
 
-        let mut pixels_white = vec![];
-        let mut pixels_black = vec![];
-        let mut pixels_mask = vec![];
-        for x in 0..size.0 {
-            for y in 0..size.1 {
-                let pixel_r = cursor_data[((x + y * size.0) * 4) as usize];
-                let pixel_g = cursor_data[((x + y * size.0) * 4 + 1) as usize];
-                let pixel_b = cursor_data[((x + y * size.0) * 4 + 2) as usize];
-                let pixel_a = cursor_data[((x + y * size.0) * 4 + 3) as usize];
-                let color = (pixel_r as u32 + pixel_g as u32 + pixel_b as u32) / 3;
+        let _ = render::create_picture(
+            &self.conn,
+            picture,
+            pixmap.pixmap(),
+            self.bgra_format_id,
+            &Default::default(),
+        )
+        .context("Cannot create picture")?;
 
-                if color > 0x70 {
-                    pixels_white.push(Point {
-                        x: x as i16,
-                        y: y as i16,
-                    });
-                } else {
-                    pixels_black.push(Point {
-                        x: x as i16,
-                        y: y as i16,
-                    });
-                }
-                if pixel_a > 0x30 {
-                    pixels_mask.push(Point {
-                        x: x as i16,
-                        y: y as i16,
-                    });
-                }
-            }
-        }
-        self.conn
-            .poly_point(
-                CoordMode::ORIGIN,
-                pixmap_data.pixmap(),
-                white_gc.gcontext(),
-                &pixels_white,
-            )
-            .context("Error in poly_point")?
-            .check()
-            .context("Error in poly_point check")?;
-        self.conn
-            .poly_point(
-                CoordMode::ORIGIN,
-                pixmap_data.pixmap(),
-                black_gc.gcontext(),
-                &pixels_black,
-            )
-            .context("Error in poly_point")?
-            .check()
-            .context("Error in poly_point check")?;
-        self.conn
-            .poly_point(
-                CoordMode::ORIGIN,
-                pixmap_mask.pixmap(),
-                white_gc.gcontext(),
-                &pixels_mask,
-            )
-            .context("Error in poly_point")?
-            .check()
-            .context("Error in poly_point check")?;
+        let _ = render::create_cursor(&self.conn, cursor, picture, hot.0 as _, hot.1 as _)
+            .context("Cannot create cursor")?;
 
-        /*
-        TODO XXX: the cursor createion seems to support pixmap of
-        data & mask of the same depth. As the mask depth is 1, the
-        data pixmap seems locked to 1 bit depth. This implies ugly 1
-        bit depth cursors
-         */
-        self.conn
-            .create_cursor(
-                cid,
-                pixmap_data.pixmap(),
-                pixmap_mask.pixmap(),
-                0xffff,
-                0xffff,
-                0xffff,
-                0x0000,
-                0x0000,
-                0x0000,
-                hot.0,
-                hot.1,
-            )
-            .context("Error in create_cursor")?
-            .check()
-            .context("Error in create_cursor check")?;
-
-        let values = ChangeWindowAttributesAux::default().cursor(Some(cid));
+        let values = ChangeWindowAttributesAux::default().cursor(Some(cursor));
         self.conn
             .change_window_attributes(self.window_info.window, &values)
             .context("Error in change_window_attributes")?
@@ -758,10 +715,12 @@ impl Client for ClientInfo {
 
         self.conn.flush().context("Error in x11rb flush")?;
         self.conn
-            .free_cursor(cid)
+            .free_cursor(cursor)
             .context("Error in free_cursor")?
             .check()
             .context("Error in free_cursor check")?;
+        render::free_picture(&self.conn, picture).context("Cannot free picture")?;
+
         Ok(())
     }
 
