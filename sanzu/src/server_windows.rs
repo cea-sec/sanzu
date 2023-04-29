@@ -6,6 +6,7 @@ use crate::{
     video_encoder::{Encoder, EncoderTimings},
 };
 use anyhow::{Context, Result};
+use byteorder::{LittleEndian, ReadBytesExt};
 
 use clipboard_win::{formats, get_clipboard, set_clipboard};
 use lock_keys::LockKeyWrapper;
@@ -15,6 +16,7 @@ use std::{
     cmp::Ordering,
     collections::HashMap,
     ffi::CString,
+    io::Cursor,
     ptr::null_mut,
     sync::{
         atomic,
@@ -32,14 +34,25 @@ use winapi::{
     shared::{
         dxgi, dxgi1_2, dxgitype,
         guiddef::GUID,
-        minwindef::{BOOL, LPARAM, LRESULT, UINT, WPARAM},
+        minwindef::{BOOL, DWORD, LPARAM, LRESULT, UINT, WPARAM},
         windef::{HWND, RECT},
         winerror::{DXGI_ERROR_ACCESS_LOST, DXGI_ERROR_WAIT_TIMEOUT, SUCCEEDED},
     },
     um::{
         d3d11, d3dcommon,
+        fileapi::{CreateFileA, OPEN_EXISTING},
+        handleapi::INVALID_HANDLE_VALUE,
+        ioapiset::DeviceIoControl,
         libloaderapi::GetModuleHandleA,
+        setupapi::{
+            SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo, SetupDiEnumDeviceInterfaces,
+            SetupDiGetClassDevsA, SetupDiGetDeviceInterfaceDetailA,
+            SetupDiGetDeviceRegistryPropertyA, DIGCF_DEVICEINTERFACE, DIGCF_PRESENT, SPDRP_ADDRESS,
+            SPDRP_BUSNUMBER, SP_DEVICE_INTERFACE_DATA, SP_DEVICE_INTERFACE_DETAIL_DATA_A,
+            SP_DEVINFO_DATA,
+        },
         wingdi::{GetDeviceCaps, HORZRES, VERTRES},
+        winioctl::{CTL_CODE, FILE_ANY_ACCESS, FILE_DEVICE_UNKNOWN, METHOD_BUFFERED},
         winuser::{
             CreateWindowExA, DefWindowProcA, DispatchMessageA, EnumWindows, GetDC,
             GetSystemMetrics, GetWindowInfo, GetWindowLongA, GetWindowRect, GetWindowTextA,
@@ -63,6 +76,8 @@ lazy_static! {
 
 }
 
+const IVSHMEM_CACHE_WRITECOMBINED: u8 = 2;
+
 /// Holds information on the server
 pub struct ServerInfo {
     pub img: Option<Vec<u8>>,
@@ -77,6 +92,8 @@ pub struct ServerInfo {
     /// Screen height
     pub height: u16,
     pub event_receiver: Receiver<tunnel::MessageSrv>,
+    /// For ivshmem export
+    pub map_info: Option<(u64, u64)>,
 }
 
 #[derive(Debug)]
@@ -315,6 +332,34 @@ fn d3d11_get_device_idxgidevice(device: &d3d11::ID3D11Device) -> Result<&dxgi::I
     unsafe { p_idxgidevice.as_ref() }.context("Null idxgiadapter")
 }
 
+fn d3d11_get_device_idxgidevice1(device: &d3d11::ID3D11Device) -> Result<&dxgi::IDXGIDevice1> {
+    /* GUID_ENTRY(0x77db970f,0x6276,0x48ba,0xba,0x28,0x07,0x01,0x43,0xb4,0x39,0x2c,IID_IDXGIDevice1) */
+    let riid_idxgidevice1 = GUID {
+        Data1: 0x77db970f,
+        Data2: 0x6276,
+        Data3: 0x48ba,
+        Data4: [0xba, 0x28, 0x07, 0x01, 0x43, 0xb4, 0x39, 0x2c],
+    };
+
+    let mut p_idxgidevice1: *mut c_void = null_mut();
+
+    let ret = unsafe {
+        device.QueryInterface(
+            &riid_idxgidevice1 as *const _,
+            &mut p_idxgidevice1 as *mut _,
+        )
+    };
+
+    if SUCCEEDED(ret) {
+        info!("Query interface success {:?}", p_idxgidevice1);
+    } else {
+        error!("Error in queryinterface");
+        return Err(anyhow!("Error in query interface idxgidevice1"));
+    }
+    let p_idxgidevice1: *mut dxgi::IDXGIDevice1 = unsafe { std::mem::transmute(p_idxgidevice1) };
+    unsafe { p_idxgidevice1.as_ref() }.context("Null idxgiadapter1")
+}
+
 fn d3d11_get_idxgidevice_idxgiadapter(
     idxgidevice: &dxgi::IDXGIDevice,
 ) -> Result<&dxgi::IDXGIAdapter> {
@@ -442,7 +487,7 @@ fn acquire_dxgi_frame() -> Result<(Vec<u8>, u32, u32, u32)> {
         )
     };
     if !SUCCEEDED(ret) {
-        error!("acquirenextframe {:?}", ret);
+        warn!("acquirenextframe {:?}", ret);
         let result = match ret {
             DXGI_ERROR_ACCESS_LOST => {
                 // Re init d3d11
@@ -627,6 +672,11 @@ pub fn init_d3d11() -> Result<()> {
         let idxgidevice =
             d3d11_get_device_idxgidevice(d3d11_device).context("Cannot get idxgidevice")?;
 
+        if let Ok(idxgidevice1) = d3d11_get_device_idxgidevice1(d3d11_device) {
+            let ret = unsafe { idxgidevice1.SetMaximumFrameLatency(1) };
+            error!("Set max frame latency: {:x}", ret);
+        }
+
         let idxgiadapter =
             d3d11_get_idxgidevice_idxgiadapter(idxgidevice).context("Cannot get idxgiadapter")?;
 
@@ -754,8 +804,258 @@ pub fn init_d3d11() -> Result<()> {
     Err(anyhow!("Cannot create d3d11 device"))
 }
 
+pub fn map_ivshmem() -> Result<(u64, u64)> {
+    let ioctl_ivshmem_request_size: DWORD =
+        CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS);
+    let ioctl_ivshmem_request_mmap: DWORD =
+        CTL_CODE(FILE_DEVICE_UNKNOWN, 0x802, METHOD_BUFFERED, FILE_ANY_ACCESS);
+
+    let guid_devinterface_ivshmem = GUID {
+        Data1: 0xdf576976,
+        Data2: 0x569d,
+        Data3: 0x4672,
+        Data4: [0x95, 0xa0, 0xf5, 0x7e, 0x4e, 0xa0, 0xb2, 0x10],
+    };
+
+    let dev_info_set = unsafe {
+        SetupDiGetClassDevsA(
+            &guid_devinterface_ivshmem,
+            null_mut(),
+            null_mut(),
+            DIGCF_PRESENT | DIGCF_DEVICEINTERFACE,
+        )
+    };
+    if dev_info_set == INVALID_HANDLE_VALUE {
+        panic!("Error during SetupDiGetClassDevsA");
+    }
+
+    for index in 0.. {
+        let mut dev_info_data = SP_DEVINFO_DATA::default();
+        dev_info_data.cbSize = std::mem::size_of::<SP_DEVINFO_DATA>() as u32;
+        let ret = unsafe { SetupDiEnumDeviceInfo(dev_info_set, index, &mut dev_info_data) };
+        if ret == 0 {
+            continue;
+        }
+
+        /* Read bus */
+        let mut bus_data = vec![0u8; 4];
+        let ret = unsafe {
+            SetupDiGetDeviceRegistryPropertyA(
+                dev_info_set,
+                &mut dev_info_data,
+                SPDRP_BUSNUMBER,
+                null_mut(),
+                bus_data.as_mut_ptr() as *mut u8,
+                std::mem::size_of::<DWORD>() as u32,
+                null_mut(),
+            )
+        };
+
+        if ret == 0 {
+            continue;
+        }
+
+        let mut rdr = Cursor::new(bus_data);
+        let bus = match rdr.read_u32::<LittleEndian>() {
+            Ok(bus) => bus,
+            Err(_) => {
+                continue;
+            }
+        };
+
+        /* Read addr */
+        let mut addr_data = vec![0u8; 4];
+        let ret = unsafe {
+            SetupDiGetDeviceRegistryPropertyA(
+                dev_info_set,
+                &mut dev_info_data,
+                SPDRP_ADDRESS,
+                null_mut(),
+                addr_data.as_mut_ptr() as *mut u8,
+                std::mem::size_of::<DWORD>() as u32,
+                null_mut(),
+            )
+        };
+
+        if ret == 0 {
+            continue;
+        }
+
+        let mut rdr = Cursor::new(addr_data);
+        let addr = match rdr.read_u32::<LittleEndian>() {
+            Ok(addr) => addr,
+            Err(_) => {
+                continue;
+            }
+        };
+
+        info!("IVSHMEM: {} {:x}", bus, addr);
+
+        let mut dev_interface_data = SP_DEVICE_INTERFACE_DATA::default();
+        dev_interface_data.cbSize = std::mem::size_of::<SP_DEVICE_INTERFACE_DATA>() as u32;
+
+        let ret = unsafe {
+            SetupDiEnumDeviceInterfaces(
+                dev_info_set,
+                &mut dev_info_data,
+                &guid_devinterface_ivshmem,
+                0,
+                &mut dev_interface_data,
+            )
+        };
+
+        if ret == 0 {
+            warn!("Error in SetupDiEnumDeviceInterfaces");
+            continue;
+        }
+
+        let mut req_size: DWORD = 0;
+
+        unsafe {
+            SetupDiGetDeviceInterfaceDetailA(
+                dev_info_set,
+                &mut dev_interface_data,
+                null_mut(),
+                0,
+                &mut req_size,
+                null_mut(),
+            )
+        };
+        info!("Req size {:x}", req_size);
+
+        if req_size == 0 {
+            warn!("Error in SetupDiGetDeviceInterfaceDetail req size");
+            continue;
+        }
+
+        info!("Req size {:x}", req_size);
+
+        let mut inf_data_buffer = vec![0u8; req_size as usize];
+        let p_inf_data: *mut SP_DEVICE_INTERFACE_DETAIL_DATA_A =
+            unsafe { std::mem::transmute(inf_data_buffer.as_mut_ptr()) };
+        let mut inf_data = unsafe { p_inf_data.as_mut() }.context("Null inf_data")?;
+        inf_data.cbSize = std::mem::size_of::<SP_DEVICE_INTERFACE_DETAIL_DATA_A>() as u32;
+        info!("inf data {:x}", inf_data.cbSize);
+        let ret = unsafe {
+            SetupDiGetDeviceInterfaceDetailA(
+                dev_info_set,
+                &mut dev_interface_data,
+                p_inf_data,
+                req_size,
+                null_mut(),
+                null_mut(),
+            )
+        };
+
+        if ret == 0 {
+            warn!("Error in SetupDiGetDeviceInterfaceDetail for device");
+            continue;
+        }
+
+        info!("IVSHMEM path: {:?}", inf_data.DevicePath);
+
+        let handle = unsafe {
+            CreateFileA(
+                inf_data.DevicePath.as_mut_ptr(),
+                0,
+                0,
+                null_mut(),
+                OPEN_EXISTING,
+                0,
+                null_mut(),
+            )
+        };
+
+        if handle == INVALID_HANDLE_VALUE {
+            unsafe {
+                SetupDiDestroyDeviceInfoList(dev_info_set);
+            }
+            warn!("CreateFile returned INVALID_HANDLE_VALUE");
+            continue;
+        }
+
+        info!("Open ivshmem ok");
+
+        let mut size_data = vec![0u8; 8];
+        let ret = unsafe {
+            DeviceIoControl(
+                handle,
+                ioctl_ivshmem_request_size,
+                null_mut(),
+                0,
+                size_data.as_mut_ptr() as *mut c_void,
+                std::mem::size_of::<u64>() as u32,
+                null_mut(),
+                null_mut(),
+            )
+        };
+        if ret == 0 {
+            warn!("DeviceIoControl Failed");
+            continue;
+        }
+
+        let mut rdr = Cursor::new(size_data);
+        let size = match rdr.read_u64::<LittleEndian>() {
+            Ok(size) => size,
+            Err(_) => {
+                continue;
+            }
+        };
+        info!("ivhsmem size: {:x}\n", size);
+
+        #[repr(C)]
+        #[derive(Debug)]
+        struct IvshmemMmap {
+            peer_id: u16,
+            size: u64,
+            ptr: *mut c_void,
+            vectors: u16,
+        }
+
+        #[repr(C)]
+        #[derive(Debug)]
+        struct IvshmemMmapConfig {
+            cache_mode: u8,
+        }
+
+        let ivshmem_mmap_size = std::mem::size_of::<IvshmemMmap>();
+        let ivshmem_mmap_config_size = std::mem::size_of::<IvshmemMmapConfig>();
+
+        let mut map_buffer = vec![0u8; ivshmem_mmap_size];
+        let p_map: *mut IvshmemMmap = unsafe { std::mem::transmute(map_buffer.as_mut_ptr()) };
+        let map = unsafe { p_map.as_mut() }.context("Null map")?;
+
+        let mut config_buffer = vec![0u8; ivshmem_mmap_config_size];
+        let p_config: *mut IvshmemMmapConfig =
+            unsafe { std::mem::transmute(config_buffer.as_mut_ptr()) };
+        let mut config = unsafe { p_config.as_mut() }.context("Null config")?;
+        config.cache_mode = IVSHMEM_CACHE_WRITECOMBINED;
+
+        let ret = unsafe {
+            DeviceIoControl(
+                handle,
+                ioctl_ivshmem_request_mmap,
+                p_config as *mut c_void,
+                ivshmem_mmap_config_size as u32,
+                p_map as *mut c_void,
+                ivshmem_mmap_size as u32,
+                null_mut(),
+                null_mut(),
+            )
+        };
+        if ret == 0 {
+            warn!("DeviceIoControl Failed");
+            continue;
+        }
+        info!("mmap: {:x?} {:x}\n", map.ptr, map.size);
+        return Ok((map.ptr as u64, map.size));
+    }
+
+    Err(anyhow!("No ivshmem found"))
+}
+
 pub fn init_win(
-    _arguments: &ArgumentsSrv,
+    arguments: &ArgumentsSrv,
     config: &ConfigServer,
     _server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Server>> {
@@ -827,6 +1127,15 @@ pub fn init_win(
         }
     });
     init_d3d11().context("Cannot init d3d11")?;
+
+    let mut map_info = None;
+    if arguments.export_video_pci {
+        info!("Search ivshmem");
+        map_info = Some(map_ivshmem().context("Error during ivshmem")?);
+    }
+
+    info!("ivshmem result: {:?}", map_info);
+
     let server = ServerInfo {
         img: None,
         max_stall_img: config.video.max_stall_img,
@@ -835,6 +1144,7 @@ pub fn init_win(
         width: screen_width,
         height: screen_height,
         event_receiver,
+        map_info,
     };
     Ok(Box::new(server))
 }
@@ -1059,6 +1369,13 @@ impl Server for ServerInfo {
         let mut timings = None;
         if self.frozen_frames_count < self.max_stall_img {
             if let Some(ref data) = &self.img {
+                if let Some(ref mut map_info) = &mut self.map_info {
+                    let mem_out = unsafe {
+                        std::slice::from_raw_parts_mut(map_info.0 as *mut u8, map_info.1 as _)
+                    };
+                    mem_out[..data.len()].copy_from_slice(data);
+                }
+
                 let (width, height) = (self.width as u32, self.height as u32);
                 let result = video_encoder
                     .encode_image(data, width, height, width * 4, self.img_count)
@@ -1068,20 +1385,28 @@ impl Server for ServerInfo {
                 timings = Some(result.1);
 
                 /* Prepare encoded image */
-                let img = if video_encoder.is_raw() {
-                    tunnel::message_srv::Msg::ImgRaw(tunnel::ImageRaw {
+                let img = match video_encoder.is_raw() {
+                    true => match &self.map_info {
+                        None => tunnel::message_srv::Msg::ImgRaw(tunnel::ImageRaw {
+                            data: encoded,
+                            width,
+                            height,
+                            bytes_per_line: width * 4,
+                        }),
+                        Some(_) => tunnel::message_srv::Msg::ImgRaw(tunnel::ImageRaw {
+                            data: vec![],
+                            width,
+                            height,
+                            bytes_per_line: width * 4,
+                        }),
+                    },
+                    false => tunnel::message_srv::Msg::ImgEncoded(tunnel::ImageEncoded {
                         data: encoded,
                         width,
                         height,
-                        bytes_per_line: width * 4,
-                    })
-                } else {
-                    tunnel::message_srv::Msg::ImgEncoded(tunnel::ImageEncoded {
-                        data: encoded,
-                        width,
-                        height,
-                    })
+                    }),
                 };
+
                 let msg_img = tunnel::MessageSrv { msg: Some(img) };
                 events.push(msg_img);
             }
