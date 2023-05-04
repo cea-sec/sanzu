@@ -1,6 +1,6 @@
 use crate::{
     client_utils::{Area, Client},
-    utils::{ArgumentsClient, ClipboardConfig, ClipboardSelection},
+    utils::{ClientArgsConfig, ClipboardConfig, ClipboardSelection},
     utils_x11,
 };
 use anyhow::{Context, Result};
@@ -136,7 +136,7 @@ fn create_gc<C: Connection>(
 
 fn setup_window<C: Connection>(
     conn: &C,
-    arguments: &ArgumentsClient,
+    arguments: &ClientArgsConfig,
     screen: &Screen,
     window_position: (i16, i16),
     window_size: (u16, u16),
@@ -227,7 +227,7 @@ fn setup_window<C: Connection>(
 
 fn new_area<C: Connection>(
     conn: &C,
-    arguments: &ArgumentsClient,
+    arguments: &ClientArgsConfig,
     screen: &Screen,
     size: (u16, u16),
 ) -> Result<WindowInfo> {
@@ -259,7 +259,7 @@ fn new_area<C: Connection>(
 /// Initialize the x11 shape extension to support custom shaped windows (used in
 /// the seamless version)
 pub fn init_x11rb(
-    arguments: &ArgumentsClient,
+    arguments: &ClientArgsConfig,
     seamless: bool,
     server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Client>> {
@@ -315,8 +315,16 @@ pub fn init_x11rb(
 
     let skip_clipboard_primary_thread = skip_clipboard_primary.clone();
     let skip_clipboard_clipboard_thread = skip_clipboard_clipboard.clone();
+    let clipboard_config = match arguments.clipboard.as_str() {
+        "allow" => ClipboardConfig::Allow,
+        "deny" => ClipboardConfig::Deny,
+        "trig" => ClipboardConfig::Trig,
+        _ => {
+            return Err(anyhow!("Unknown clipboard config: {}", arguments.clipboard));
+        }
+    };
 
-    match arguments.clipboard_config {
+    match clipboard_config {
         ClipboardConfig::Allow | ClipboardConfig::Trig => {
             // Listen "primary" clipboard events
             thread::spawn(move || {
@@ -412,7 +420,7 @@ pub fn init_x11rb(
         need_update: true,
         seamless,
         clipboard,
-        clipboard_config: arguments.clipboard_config,
+        clipboard_config,
         clipboard_event_receiver,
         clipboard_last_value: None,
         skip_clipboard_primary,
