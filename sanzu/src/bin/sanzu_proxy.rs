@@ -7,13 +7,19 @@ extern crate log;
 use sanzu::{
     config::read_server_config,
     proxy,
-    utils::{init_logger, ProxyArgs, ProxyArgsConfig},
+    utils::{init_logger, is_proto_arg, ProxyArgs, ProxyArgsConfig},
 };
+
 use sanzu_common::proto::VERSION;
 
 use twelf::Layer;
 
 fn main() -> Result<()> {
+    if is_proto_arg() {
+        println!("Protocol version: {VERSION}");
+        return Ok(());
+    }
+
     let matches = ProxyArgs::command().get_matches();
     let config_path = matches.get_one::<std::path::PathBuf>("config_path");
 
@@ -35,6 +41,7 @@ fn main() -> Result<()> {
         println!("Protocol version: {VERSION}");
         return Ok(());
     }
+
     let conf =
         read_server_config(&proxy_config.config).context("Cannot read configuration file")?;
     if let Err(err) = proxy::run(&conf, &proxy_config) {

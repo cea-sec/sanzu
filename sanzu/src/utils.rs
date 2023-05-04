@@ -2,7 +2,7 @@ use anyhow::Result;
 use byteorder::{BigEndian, ByteOrder};
 use std::net::IpAddr;
 
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use twelf::config;
 
 pub enum ServerEvent {
@@ -486,4 +486,25 @@ pub fn init_logger(level: u8) {
     }
 
     log_builder.init();
+}
+
+#[derive(Parser, Debug)]
+pub struct ProtoArgs {
+    #[clap(long, default_value_t = false, help = "Display proto version")]
+    pub proto: bool,
+}
+
+/// Test if the only argument is --proto
+/// TODO: what we want here is an argument which can override mandatory positional arguments
+/// The goal is to allow for example "sanzu_client --proto" even if sanzu_client
+/// needs 2 positional arguments. To do this, we build a dummy clap parser with
+/// only one argument.
+/// Don't forget to add proto in the real command line.
+pub fn is_proto_arg() -> bool {
+    if let Ok(matches) = ProtoArgs::command().try_get_matches() {
+        if *matches.get_one::<bool>("proto").unwrap() {
+            return true;
+        }
+    }
+    false
 }

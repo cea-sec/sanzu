@@ -1,20 +1,25 @@
 use anyhow::{Context, Result};
+use clap::CommandFactory;
 
 #[macro_use]
 extern crate log;
 
-use clap::CommandFactory;
-use twelf::Layer;
-
 use sanzu::{
     config::read_server_config,
     server,
-    utils::{init_logger, ServerArgs, ServerArgsConfig},
+    utils::{init_logger, is_proto_arg, ServerArgs, ServerArgsConfig},
 };
 
 use sanzu_common::proto::VERSION;
 
+use twelf::Layer;
+
 fn main() -> Result<()> {
+    if is_proto_arg() {
+        println!("Protocol version: {VERSION}");
+        return Ok(());
+    }
+
     let matches = ServerArgs::command().get_matches();
     let config_path = matches.get_one::<std::path::PathBuf>("config_path");
 
@@ -36,6 +41,7 @@ fn main() -> Result<()> {
         println!("Protocol version: {VERSION}");
         return Ok(());
     }
+
     let conf =
         read_server_config(&server_config.config).context("Cannot read configuration file")?;
     if let Err(err) = server::run(&conf, &server_config) {

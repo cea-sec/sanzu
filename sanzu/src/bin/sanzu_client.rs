@@ -1,15 +1,14 @@
 #![windows_subsystem = "windows"]
 use anyhow::Result;
+use clap::CommandFactory;
 
 #[macro_use]
 extern crate log;
 
-use clap::CommandFactory;
-
 use sanzu::{
     client,
     config::{read_client_config, ConfigClient},
-    utils::{init_logger, ClientArgs, ClientArgsConfig},
+    utils::{init_logger, is_proto_arg, ClientArgs, ClientArgsConfig},
 };
 
 use sanzu_common::proto::VERSION;
@@ -29,6 +28,11 @@ fn main() -> Result<()> {
         }
     }
 
+    if is_proto_arg() {
+        println!("Protocol version: {VERSION}");
+        return Ok(());
+    }
+
     let matches = ClientArgs::command().get_matches();
     let config_path = matches.get_one::<std::path::PathBuf>("config_path");
 
@@ -44,12 +48,12 @@ fn main() -> Result<()> {
 
     let client_config = ClientArgsConfig::with_layers(&layers).unwrap();
 
+    init_logger(client_config.verbose);
+
     if client_config.proto {
         println!("Protocol version: {VERSION}");
         return Ok(());
     }
-
-    init_logger(client_config.verbose);
 
     let conf = match client_config.config {
         Some(ref client_config) => {
