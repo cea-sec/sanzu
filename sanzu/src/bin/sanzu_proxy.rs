@@ -7,15 +7,13 @@ extern crate log;
 use sanzu::{
     config::read_server_config,
     proxy,
-    utils::{ProxyArgs, ProxyArgsConfig},
+    utils::{init_logger, ProxyArgs, ProxyArgsConfig},
 };
 use sanzu_common::proto::VERSION;
 
 use twelf::Layer;
 
 fn main() -> Result<()> {
-    env_logger::Builder::from_default_env().init();
-
     let matches = ProxyArgs::command().get_matches();
     let config_path = matches.get_one::<std::path::PathBuf>("config_path");
 
@@ -30,6 +28,8 @@ fn main() -> Result<()> {
     ]);
 
     let proxy_config = ProxyArgsConfig::with_layers(&layers).unwrap();
+
+    init_logger(proxy_config.verbose);
 
     if proxy_config.proto {
         println!("Protocol version: {VERSION}");

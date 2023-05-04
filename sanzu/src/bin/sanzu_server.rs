@@ -9,16 +9,12 @@ use twelf::Layer;
 use sanzu::{
     config::read_server_config,
     server,
-    utils::{ServerArgs, ServerArgsConfig},
+    utils::{init_logger, ServerArgs, ServerArgsConfig},
 };
 
 use sanzu_common::proto::VERSION;
 
 fn main() -> Result<()> {
-    env_logger::Builder::from_default_env()
-        .format_timestamp_nanos()
-        .init();
-
     let matches = ServerArgs::command().get_matches();
     let config_path = matches.get_one::<std::path::PathBuf>("config_path");
 
@@ -33,6 +29,8 @@ fn main() -> Result<()> {
     ]);
 
     let server_config = ServerArgsConfig::with_layers(&layers).unwrap();
+
+    init_logger(server_config.verbose);
 
     if server_config.proto {
         println!("Protocol version: {VERSION}");

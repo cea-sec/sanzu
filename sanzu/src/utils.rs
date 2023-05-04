@@ -55,7 +55,6 @@ pub struct ServerArgsConfig {
     pub config: String,
     #[clap(
         long,
-        short = 'v',
         default_value_t = false,
         help = "Use vsock for communication layer"
     )]
@@ -171,6 +170,8 @@ tcp or vsock"
     pub keep_listening: bool,
     #[clap(long, help = "Displays protocol version")]
     pub proto: bool,
+    #[clap(short='v', long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 }
 
 #[derive(Parser, Debug)]
@@ -210,7 +211,6 @@ pub struct ClientArgsConfig {
     #[cfg(unix)]
     #[clap(
         long,
-        short = 'v',
         default_value_t = false,
         help = "Use vsock for communication layer"
     )]
@@ -315,6 +315,8 @@ without being interpreted by the local window manager"
     pub grab_keyboard: bool,
     #[clap(long, help = "Displays protocol version")]
     pub proto: bool,
+    #[clap(short='v', long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 }
 
 #[derive(Parser, Debug)]
@@ -350,7 +352,6 @@ pub struct ProxyArgsConfig {
     pub config: String,
     #[clap(
         long,
-        short = 'v',
         default_value_t = false,
         help = "Use vsock for communication layer"
     )]
@@ -401,6 +402,8 @@ pub struct ProxyArgsConfig {
     pub keep_listening: bool,
     #[clap(long, help = "Displays protocol version")]
     pub proto: bool,
+    #[clap(short='v', long, action = clap::ArgAction::Count)]
+    pub verbose: u8,
 }
 
 const MAX_HEADER_SIZE: u32 = 0x100;
@@ -459,4 +462,28 @@ pub fn get_xwd_data(data: &[u8]) -> Result<(&[u8], u32, u32, u32)> {
         window_y,
         bytes_per_line,
     ))
+}
+
+/// Logger uses env var to set default log level
+/// Change log level according to verbose option
+pub fn init_logger(level: u8) {
+    let mut log_builder = env_logger::Builder::from_default_env();
+    log_builder.format_timestamp_nanos();
+    match level {
+        0 => {}
+        1 => {
+            log_builder.filter_level(log::LevelFilter::Warn);
+        }
+        2 => {
+            log_builder.filter_level(log::LevelFilter::Info);
+        }
+        3 => {
+            log_builder.filter_level(log::LevelFilter::Debug);
+        }
+        _ => {
+            log_builder.filter_level(log::LevelFilter::Trace);
+        }
+    }
+
+    log_builder.init();
 }

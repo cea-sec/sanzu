@@ -9,7 +9,7 @@ use clap::CommandFactory;
 use sanzu::{
     client,
     config::{read_client_config, ConfigClient},
-    utils::{ClientArgs, ClientArgsConfig},
+    utils::{init_logger, ClientArgs, ClientArgsConfig},
 };
 
 use sanzu_common::proto::VERSION;
@@ -22,10 +22,6 @@ use twelf::Layer;
 use winapi::um::wincon;
 
 fn main() -> Result<()> {
-    env_logger::Builder::from_default_env()
-        .format_timestamp_nanos()
-        .init();
-
     #[cfg(windows)]
     {
         unsafe {
@@ -52,6 +48,8 @@ fn main() -> Result<()> {
         println!("Protocol version: {VERSION}");
         return Ok(());
     }
+
+    init_logger(client_config.verbose);
 
     let conf = match client_config.config {
         Some(ref client_config) => {
