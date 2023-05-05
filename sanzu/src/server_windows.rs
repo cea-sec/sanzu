@@ -1,7 +1,7 @@
 use crate::{
     config::ConfigServer,
     server_utils::Server,
-    utils::{ArgumentsSrv, ServerEvent},
+    utils::{ServerArgsConfig, ServerEvent},
     utils_win,
     video_encoder::{Encoder, EncoderTimings},
 };
@@ -755,7 +755,7 @@ pub fn init_d3d11() -> Result<()> {
 }
 
 pub fn init_win(
-    _arguments: &ArgumentsSrv,
+    _arguments: &ServerArgsConfig,
     config: &ConfigServer,
     _server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Server>> {

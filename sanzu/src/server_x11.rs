@@ -2,7 +2,7 @@ use crate::{
     config::ConfigServer,
     server_utils::Server,
     utils::ClipboardSelection,
-    utils::{get_xwd_data, ArgumentsSrv, ServerEvent},
+    utils::{get_xwd_data, ServerArgsConfig, ServerEvent},
     utils_x11,
     video_encoder::{Encoder, EncoderTimings},
 };
@@ -703,7 +703,7 @@ fn del_custom_video_mode<C: Connection>(conn: &C, window: Window) -> Result<()> 
 
 /// Initialize x11rb server handler
 pub fn init_x11rb(
-    arguments: &ArgumentsSrv,
+    arguments: &ServerArgsConfig,
     config: &ConfigServer,
     server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Server>> {

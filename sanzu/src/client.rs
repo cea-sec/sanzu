@@ -29,7 +29,7 @@ use crate::{
     //proto::{Tunnel, ReadWrite},
     sound::SoundDecoder,
     utils::{
-        get_xwd_data, ArgumentsClient, MAX_BYTES_PER_LINE, MAX_CURSOR_HEIGHT, MAX_CURSOR_WIDTH,
+        get_xwd_data, ClientArgsConfig, MAX_BYTES_PER_LINE, MAX_CURSOR_HEIGHT, MAX_CURSOR_WIDTH,
         MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
     },
     video_decoder::init_video_codec,
@@ -172,7 +172,7 @@ impl ClientInterface for StdioClientInterface {
 
 pub fn run(
     client_config: &ConfigClient,
-    arguments: &ArgumentsClient,
+    arguments: &ClientArgsConfig,
     mut client_interface: impl ClientInterface,
 ) -> Result<()> {
     let res = do_run(client_config, arguments, &mut client_interface);
@@ -182,7 +182,7 @@ pub fn run(
 
 pub fn do_run(
     client_config: &ConfigClient,
-    arguments: &ArgumentsClient,
+    arguments: &ClientArgsConfig,
     client_interface: &mut impl ClientInterface,
 ) -> Result<()> {
     let mut sound_obj = if arguments.audio {
@@ -265,10 +265,10 @@ pub fn do_run(
         }
     };
 
-    let video_shared_mem = match arguments.video_shared_mem.as_deref() {
-        Some(shared_mem_file) => {
-            let file = fs::File::open(shared_mem_file)
-                .context(format!("Error in open shared mem {shared_mem_file:?}"))?;
+    let extern_img_source = match arguments.extern_img_source.as_deref() {
+        Some(extern_img_source) => {
+            let file = fs::File::open(extern_img_source)
+                .context(format!("Error in open shared mem {extern_img_source:?}"))?;
             unsafe {
                 Some(
                     MmapOptions::new()
@@ -382,7 +382,7 @@ pub fn do_run(
     let msg = recv_server_msg_type!(server, Hello).context("Error in recv ServerHello")?;
 
     info!("{:?}", msg);
-    let codec_name = match &arguments.decoder_name {
+    let codec_name = match &arguments.decoder {
         Some(decoder_name) => decoder_name.to_owned(),
         None => msg.codec_name.to_owned(),
     };
@@ -474,8 +474,8 @@ pub fn do_run(
                     img_todo = Some((img.data, width, height));
                 }
                 Some(tunnel::message_srv::Msg::ImgRaw(img)) => {
-                    let (data, width, height, bytes_per_line) = match &video_shared_mem {
-                        Some(ref video_shared_mem) => match arguments.shm_is_xwd {
+                    let (data, width, height, bytes_per_line) = match &extern_img_source {
+                        Some(ref video_shared_mem) => match arguments.source_is_xwd {
                             true => {
                                 let (data, _xwd_width, _xwd_height, bytes_per_line) =
                                     get_xwd_data(video_shared_mem)?;

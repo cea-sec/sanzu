@@ -4,7 +4,7 @@ use crate::{
     config::ConfigServer,
     sound::{encode_sound, SOUND_FREQ},
     utils::{
-        get_xwd_data, ArgumentsProxy, MAX_BYTES_PER_LINE, MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
+        get_xwd_data, ProxyArgsConfig, MAX_BYTES_PER_LINE, MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
     },
     video_encoder::{get_encoder_category, init_video_encoder},
 };
@@ -138,8 +138,8 @@ macro_rules! send_srv_msg_type {
 
 /// Exec main loop
 ///
-pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
-    if arguments.endless_loop {
+pub fn run(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<()> {
+    if arguments.keep_listening {
         loop {
             if let Err(err) = run_server(config, arguments) {
                 error!("Server error");
@@ -151,8 +151,8 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
     }
 }
 
-pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<()> {
-    let codec_name = get_encoder_category(&arguments.encoder_name)?;
+pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<()> {
+    let codec_name = get_encoder_category(&arguments.encoder)?;
 
     let mut sound_encoder = opus::Encoder::new(
         SOUND_FREQ,
@@ -161,10 +161,10 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
     )
     .expect("Cannot create sound encoder");
 
-    let video_shared_mem = match arguments.video_shared_mem.as_deref() {
-        Some(shared_mem_file) => {
-            let file = fs::File::open(shared_mem_file)
-                .context(format!("Error in open shared mem {shared_mem_file:?}"))?;
+    let video_shared_mem = match arguments.extern_img_source.as_deref() {
+        Some(extern_img_source) => {
+            let file = fs::File::open(extern_img_source)
+                .context(format!("Error in open shared mem {extern_img_source:?}"))?;
             unsafe {
                 Some(
                     MmapOptions::new()
@@ -313,9 +313,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
     };
 
     let mut video_encoder = init_video_encoder(
-        arguments.encoder_name.as_str(),
+        arguments.encoder.as_str(),
         config.ffmpeg_options(None),
-        config.ffmpeg_options(Some(arguments.encoder_name.as_str())),
+        config.ffmpeg_options(Some(arguments.encoder.as_str())),
         &config.video.ffmpeg_options_cmd,
         (screen_size.0, screen_size.1),
     )?;
@@ -408,7 +408,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
                     /* Encode raw image */
                     let time_encode_start = Instant::now();
                     let (data, width, height, bytes_per_line) = match &video_shared_mem {
-                        Some(ref video_shared_mem) => match arguments.shm_is_xwd {
+                        Some(ref video_shared_mem) => match arguments.source_is_xwd {
                             true => {
                                 let (data, _xwd_width, _xwd_height, bytes_per_line) =
                                     get_xwd_data(video_shared_mem)?;
@@ -433,9 +433,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsProxy) -> Result<(
                     if width != screen_size.0 as u32 || height != screen_size.1 as u32 {
                         debug!("Resolution change {}x{}", width, height);
                         video_encoder = init_video_encoder(
-                            &arguments.encoder_name,
+                            &arguments.encoder,
                             config.ffmpeg_options(None),
-                            config.ffmpeg_options(Some(arguments.encoder_name.as_str())),
+                            config.ffmpeg_options(Some(arguments.encoder.as_str())),
                             &config.video.ffmpeg_options_cmd,
                             (width as u16, height as u16),
                         )

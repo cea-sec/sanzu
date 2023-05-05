@@ -34,7 +34,7 @@ use crate::config::AuthType;
 use crate::{
     config::{ConfigServer, ConfigTls},
     sound::SoundEncoder,
-    utils::{ArgumentsSrv, ServerEvent},
+    utils::{ServerArgsConfig, ServerEvent},
     video_encoder::{get_encoder_category, init_video_encoder, Encoder},
 };
 use rustls::ServerConnection;
@@ -99,8 +99,8 @@ fn auth_client(
 
 /// Exec main loop
 ///
-pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
-    if arguments.endless_loop {
+pub fn run(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result<()> {
+    if arguments.keep_listening {
         loop {
             if let Err(err) = run_server(config, arguments) {
                 error!("Server error");
@@ -121,7 +121,7 @@ pub fn run(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
 /// - encode image
 /// - serialize / send events to client
 /// - receive / handle client events
-pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()> {
+pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result<()> {
     info!("Start server");
 
     let mut sock: Box<dyn ReadWrite> = match (arguments.vsock, arguments.stdio, arguments.unixsock)
@@ -152,9 +152,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
             #[cfg(unix)]
             {
                 let socket = if arguments.connect_unixsock {
-                    std::os::unix::net::UnixStream::connect(arguments.address)?
+                    std::os::unix::net::UnixStream::connect(&arguments.address)?
                 } else {
-                    let listener = std::os::unix::net::UnixListener::bind(arguments.address)?;
+                    let listener = std::os::unix::net::UnixListener::bind(&arguments.address)?;
                     let (socket, addr) =
                         listener.accept().context("Error in UnixListener accept")?;
                     info!("Client {:?}", addr);
@@ -261,7 +261,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
             }
         }
     }
-    let codec_name = get_encoder_category(&arguments.encoder_name)?;
+    let codec_name = get_encoder_category(&arguments.encoder)?;
 
     /* Send server hello with image info & codec name */
     let (mut server_info, audio_sample_rate) =
@@ -339,9 +339,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ArgumentsSrv) -> Result<()>
         };
 
     let mut video_encoder: Box<dyn Encoder> = init_video_encoder(
-        arguments.encoder_name.as_str(),
+        arguments.encoder.as_str(),
         config.ffmpeg_options(None),
-        config.ffmpeg_options(Some(arguments.encoder_name.as_str())),
+        config.ffmpeg_options(Some(arguments.encoder.as_str())),
         &config.video.ffmpeg_options_cmd,
         server_info.size(),
     )

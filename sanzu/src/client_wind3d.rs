@@ -1,6 +1,6 @@
 use crate::{
     client_utils::{Area, Client},
-    utils::{ArgumentsClient, ClipboardConfig},
+    utils::{ClientArgsConfig, ClipboardConfig},
     utils_win,
 };
 use anyhow::{Context, Result};
@@ -1172,10 +1172,19 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
 }
 
 pub fn init_wind3d(
-    argumets: &ArgumentsClient,
+    arguments: &ClientArgsConfig,
     mut seamless: bool,
     server_size: Option<(u16, u16)>,
 ) -> Result<Box<dyn Client>> {
+    let clipboard_config = match arguments.clipboard.as_str() {
+        "allow" => ClipboardConfig::Allow,
+        "deny" => ClipboardConfig::Deny,
+        "trig" => ClipboardConfig::Trig,
+        _ => {
+            return Err(anyhow!("Unknown clipboard config: {}", arguments.clipboard));
+        }
+    };
+
     let (
         client_info,
         frame_receiver,
@@ -1185,13 +1194,13 @@ pub fn init_wind3d(
         session_receiver,
     ) = ClientWindows::build(
         server_size,
-        argumets.clipboard_config,
-        argumets.printdir.clone(),
-        argumets.sync_key_locks,
+        clipboard_config,
+        arguments.allow_print.clone(),
+        arguments.sync_key_locks,
     );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
-    let window_mode = argumets.window_mode;
-    let window_title = argumets.title.clone().as_bytes().to_vec();
+    let window_mode = arguments.window_mode;
+    let window_title = arguments.title.clone().as_bytes().to_vec();
 
     if window_mode {
         seamless = false;
