@@ -2414,6 +2414,7 @@ dependencies = [
  "sanzu-common",
  "serde",
  "serde_derive",
+ "serde_json",
  "spin_sleep",
  "toml 0.7.3",
  "vsock",
