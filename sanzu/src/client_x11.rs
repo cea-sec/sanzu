@@ -660,7 +660,7 @@ impl Client for ClientInfo {
     }
 
     fn set_cursor(&mut self, cursor_data: &[u8], size: (u32, u32), hot: (u16, u16)) -> Result<()> {
-        let (pixmap, pixmap_cookie) = PixmapWrapper::create_pixmap_and_get_cookie(
+        let pixmap = PixmapWrapper::create_pixmap(
             &self.conn,
             32,
             self.window_info.window,
@@ -669,12 +669,8 @@ impl Client for ClientInfo {
         )
         .context("Error in create_pixmap")?;
 
-        pixmap_cookie
-            .check()
-            .context("Error in create_pixmap check")?;
-
-        let gc = create_gc(&self.conn, pixmap.pixmap(), 0, 0).context("Error in create_gc")?;
-        let gc = GcontextWrapper::for_gcontext(&self.conn, gc);
+        let gc = GcontextWrapper::create_gc(&self.conn, pixmap.pixmap(), &Default::default())
+            .context("Error in create gc")?;
 
         let _ = put_image(
             &self.conn,
@@ -691,22 +687,31 @@ impl Client for ClientInfo {
         )
         .context("Cannot put image")?;
 
-        let cursor = self.conn.generate_id().context("Cannot generate id")?;
-        let picture = self.conn.generate_id().context("Cannot generate id")?;
-
-        let _ = render::create_picture(
+        let (picture, picture_cookie) = render::PictureWrapper::create_picture_and_get_cookie(
             &self.conn,
-            picture,
             pixmap.pixmap(),
             self.bgra_format_id,
             &Default::default(),
         )
         .context("Cannot create picture")?;
 
-        let _ = render::create_cursor(&self.conn, cursor, picture, hot.0 as _, hot.1 as _)
-            .context("Cannot create cursor")?;
+        picture_cookie
+            .check()
+            .context("Error in create_pixmap check")?;
 
-        let values = ChangeWindowAttributesAux::default().cursor(Some(cursor));
+        let cursor = self.conn.generate_id().context("Cannot generate id")?;
+        let _ = render::create_cursor(
+            &self.conn,
+            cursor,
+            picture.picture(),
+            hot.0 as _,
+            hot.1 as _,
+        )
+        .context("Cannot create cursor")?;
+
+        let cursor = CursorWrapper::for_cursor(&self.conn, cursor);
+
+        let values = ChangeWindowAttributesAux::default().cursor(Some(cursor.cursor()));
         self.conn
             .change_window_attributes(self.window_info.window, &values)
             .context("Error in change_window_attributes")?
@@ -714,12 +719,6 @@ impl Client for ClientInfo {
             .context("Error in change_window_attributes check")?;
 
         self.conn.flush().context("Error in x11rb flush")?;
-        self.conn
-            .free_cursor(cursor)
-            .context("Error in free_cursor")?
-            .check()
-            .context("Error in free_cursor check")?;
-        render::free_picture(&self.conn, picture).context("Cannot free picture")?;
 
         Ok(())
     }
