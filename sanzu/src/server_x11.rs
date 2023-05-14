@@ -395,6 +395,10 @@ fn get_property32<C: Connection>(
         .reply()
         .context("Error in get_property reply")?;
 
+    if ret.length == 0 {
+        // If property is absent, return empty array instead of format error
+        return Ok(vec![]);
+    }
     let values = ret
         .value32()
         .context("Incorrect format in GetProperty reply")?;
