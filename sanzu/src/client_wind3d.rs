@@ -1085,16 +1085,27 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
         yhot,
         cursor_data.len()
     );
-
-    let mut cursor_bgra = vec![];
-    for values in cursor_data.chunks(4) {
-        if let &[r, g, b, a] = values {
-            cursor_bgra.push(b);
-            cursor_bgra.push(g);
-            cursor_bgra.push(r);
-            cursor_bgra.push(a);
+    let is_null_cursor = cursor_data.iter().all(|v| *v == 0);
+    let cursor_bgra = if is_null_cursor {
+        // HACK Special case: if cursor is all 0, windows generates a black icon
+        // (even if all alpha components are 0) so we force the first pixel
+        // alpha channel equals to 1. This will make a full transparent cursor.
+        let mut cursor_bgra = vec![0; cursor_data.len()];
+        // We know here that cursor size is more than 4 bytes
+        cursor_bgra[3] = 1;
+        cursor_bgra
+    } else {
+        let mut cursor_bgra = vec![];
+        for values in cursor_data.chunks(4) {
+            if let &[r, g, b, a] = values {
+                cursor_bgra.push(b);
+                cursor_bgra.push(g);
+                cursor_bgra.push(r);
+                cursor_bgra.push(a);
+            }
         }
-    }
+        cursor_bgra
+    };
 
     // Set minimum width to 32 pixels to avoid windows cursor scale
     let (data, width, height) = if width < MIN_CURSOR_SIZE {
