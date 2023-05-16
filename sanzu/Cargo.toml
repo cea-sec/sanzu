@@ -27,7 +27,7 @@ lazy_static = "1.4"
 libc = "0.2"
 lock_keys = {git="https://github.com/risoflora/lock_keys", rev="38d97697c054d56e40c3975c0add04c33a05e4f4"}
 log = "0.4"
-memmap2 = "0.5"
+memmap2 = "0.6"
 opus= "0.3"
 rpassword = "7.2"
 rustls = "0.21"
