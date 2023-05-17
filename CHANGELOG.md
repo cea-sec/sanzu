@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- extern-img-source short version is '-k' for all binaries
+### Fixed
+- Remove default listen port for sanzu_proxy (resulting in vsock err)
+### Removed
+- '-i' short version for "--export-video-pci" for sanzu_server
+
 ## [0.1.3] - 2023-05-16
 
 ### Changed

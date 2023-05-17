@@ -126,7 +126,6 @@ pub struct ServerArgsConfig {
     pub raw_sound: bool,
     #[clap(
         long,
-        short = 'i',
         default_value_t = false,
         help = r"Export video to a pci shared memory
 Example: if the video server runs in a vm,
@@ -290,14 +289,14 @@ Ex: -j c:\user\dupond\printdir\
     pub sync_key_locks: bool,
     #[clap(
         long,
-        short = 'i',
+        short = 'k',
         help = r"Input video from shared memory
 Example: if the video server runs in a vm,
 the video buffer is exfiltrated using guest/host shared memory instead of
 tcp or vsock"
     )]
     pub extern_img_source: Option<String>,
-    #[clap(long, short = 'y', help = "Input from shared memory is in xwd format")]
+    #[clap(long, short = 'y', help = "Video source is xwd formated")]
     pub source_is_xwd: bool,
     #[clap(
         long,
@@ -367,7 +366,7 @@ pub struct ProxyArgsConfig {
         help = "Listen address. Subnet or unix path"
     )]
     pub listen_address: IpAddr,
-    #[clap(long, short = 'p', default_value = "1122", help = "Bind port number")]
+    #[clap(long, short = 'p', help = "Bind port number")]
     pub listen_port: Option<u16>,
     #[clap(long, short = 'u', help = "Use unix socket for communication layer")]
     pub unix_socket: Option<String>,
@@ -391,7 +390,7 @@ pub struct ProxyArgsConfig {
         help = "Use video source from file instead of video server api"
     )]
     pub extern_img_source: Option<String>,
-    #[clap(long, short = 'w', help = "Video source is xwd formated")]
+    #[clap(long, short = 'y', help = "Video source is xwd formated")]
     pub source_is_xwd: bool,
     #[clap(
         long,
