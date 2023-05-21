@@ -398,6 +398,18 @@ pub struct ProxyArgsConfig {
         default_value_t = false,
         help = "Loop if client disconnect instead of quitting"
     )]
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "Disable client to server clipboard"
+    )]
+    pub disable_client_clipboard: bool,
+    #[clap(
+        long,
+        default_value_t = false,
+        help = "Disable server to client clipboard"
+    )]
+    pub disable_server_clipboard: bool,
     pub keep_listening: bool,
     #[clap(long, help = "Displays protocol version")]
     pub proto: bool,

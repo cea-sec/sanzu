@@ -389,7 +389,11 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
                         events.push(msg);
                     }
                 }
-
+                event @ Some(tunnel::message_srv::Msg::Clipboard(_)) => {
+                    if !arguments.disable_server_clipboard {
+                        events.push(tunnel::MessageSrv { msg: event });
+                    }
+                }
                 Some(tunnel::message_srv::Msg::Display(event)) => {
                     let (width, height) = (event.width, event.height);
                     debug!("New codec {}x{}", width, height);
@@ -483,7 +487,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
                         Some(format!("{:.1?}", time_encode_stop - time_encode_start));
                 }
                 Some(msg) => {
-                    /* Skip other events */
+                    /* Forward other events */
                     events.push(tunnel::MessageSrv { msg: Some(msg) });
                 }
                 _ => {}
@@ -499,6 +503,23 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
         let msgs = recv_client_msg_type!(&mut client, Msgsclient)
             .context("Error in recv MessagesClient")
             .map_err(|err| send_client_err_event(&mut server, err))?;
+
+        let mut events = vec![];
+        for msg in msgs.msgs {
+            match msg.msg {
+                event @ Some(tunnel::message_client::Msg::Clipboard(_)) => {
+                    if !arguments.disable_client_clipboard {
+                        events.push(tunnel::MessageClient { msg: event });
+                    }
+                }
+                Some(msg) => {
+                    /* Forward other events */
+                    events.push(tunnel::MessageClient { msg: Some(msg) });
+                }
+                _ => {}
+            }
+        }
+        let msgs = tunnel::MessagesClient { msgs: events };
 
         send_client_msg_type!(&mut server, msgs, Msgsclient)
             .context("Error in send MessagesClient")
