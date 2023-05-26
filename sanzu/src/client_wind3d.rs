@@ -219,7 +219,7 @@ pub fn set_region_clipping(hwnd: HWND, zones: &[Area]) -> Result<()> {
 
     let ret = unsafe { SetWindowRgn(hwnd as HWND, hwnd_rgn, 0) };
     if ret == 0 {
-        return Err(anyhow!("Cannot  SetWindowRgn"));
+        return Err(anyhow!("Cannot SetWindowRgn"));
     }
 
     Ok(())
@@ -450,17 +450,17 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
 
     let mut p_direct3d_device: *mut IDirect3DDevice9 = null_mut();
 
-    if direct3d_ref.CreateDevice(
+    let ret = direct3d_ref.CreateDevice(
         D3DADAPTER_DEFAULT,
         D3DDEVTYPE_HAL,
         hwnd,
         D3DCREATE_SOFTWARE_VERTEXPROCESSING,
         &mut d3dpp as *mut _,
         &mut p_direct3d_device as *mut _,
-    ) < 0
-    {
+    );
+    if ret < 0 {
         direct3d_ref.Release();
-        return Err(anyhow!("Cannot create d3d device"));
+        return Err(anyhow!("Cannot create d3d device {:#X}", ret));
     }
 
     let mut device = Direct3DDevice::new(p_direct3d_device);
@@ -468,16 +468,16 @@ unsafe fn init_d3d9(hwnd: HWND, width: u32, height: u32) -> Result<SanzuDirect3D
     let device_ref = device.get_inner().as_ref().context("Null direct3ddevice")?;
 
     let mut p_direct3d_surface: *mut IDirect3DSurface9 = null_mut();
-    if device_ref.CreateOffscreenPlainSurface(
+    let ret = device_ref.CreateOffscreenPlainSurface(
         width,
         height,
         D3DFMT_X8R8G8B8,
         D3DPOOL_DEFAULT,
         &mut p_direct3d_surface as *mut _,
         null_mut(),
-    ) != 0
-    {
-        return Err(anyhow!("Error in CreateOffscreenPlainSurface"));
+    );
+    if ret != 0 {
+        return Err(anyhow!("Error in CreateOffscreenPlainSurface{:#X}", ret));
     }
 
     let surface = Direct3DSurface::new(p_direct3d_surface);
@@ -513,7 +513,7 @@ unsafe fn render(
 
     let ret = surface.LockRect(&mut d3d_rect as *mut _, null_mut(), 0);
     if ret != 0 {
-        return Err(anyhow!("Error in lockrect {:x?}", ret));
+        return Err(anyhow!("Error in lockrect {:#X}", ret));
     }
 
     let mut p_src = data;
@@ -526,7 +526,7 @@ unsafe fn render(
         // Unlock locked surface
         let ret = surface.UnlockRect();
         if ret != 0 {
-            return Err(anyhow!("Error in unlockrect {}", ret));
+            return Err(anyhow!("Error in unlockrect {:#X}", ret));
         }
         return Err(anyhow!("Error: pBits is null"));
     } else {
@@ -542,28 +542,30 @@ unsafe fn render(
 
     let ret = surface.UnlockRect();
     if ret != 0 {
-        return Err(anyhow!("Error in UnlockRect {:?}", ret));
+        return Err(anyhow!("Error in UnlockRect {:#X}", ret));
     }
 
-    if device.Clear(
+    let ret = device.Clear(
         0,
         null_mut(),
         D3DCLEAR_TARGET,
         D3DCOLOR_XRGB(0, 0, 0),
         1.0,
         0,
-    ) != 0
-    {
-        return Err(anyhow!("Error in Clear: {:?}", ret));
+    );
+    if ret != 0 {
+        return Err(anyhow!("Error in Clear: {:#X}", ret));
     }
 
-    if device.BeginScene() != 0 {
-        return Err(anyhow!("Error in BeginScene: {:?}", ret));
+    let ret = device.BeginScene();
+    if ret != 0 {
+        return Err(anyhow!("Error in BeginScene: {:#X}", ret));
     }
 
     let mut p_back_buffer: *mut IDirect3DSurface9 = null_mut();
-    if device.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _) != 0 {
-        return Err(anyhow!("Error in getbackbuffer: {:?}", ret));
+    let ret = device.GetBackBuffer(0, 0, D3DBACKBUFFER_TYPE_MONO, &mut p_back_buffer as *mut _);
+    if ret != 0 {
+        return Err(anyhow!("Error in getbackbuffer: {:#X}", ret));
     }
 
     let mut back_buffer = Direct3DSurface::new(p_back_buffer);
@@ -576,23 +578,30 @@ unsafe fn render(
         bottom: height as i32,
     };
 
-    if device.StretchRect(
+    let ret = device.StretchRect(
         sanzu_direct3d.surface.get_inner() as *mut _,
         null_mut(),
         back_buffer.get_inner(),
         &new_rect as *const _,
         D3DTEXF_NONE,
-    ) != 0
-    {
-        return Err(anyhow!("Error in StretchRect: {:?}", ret));
+    );
+    if ret != 0 {
+        return Err(anyhow!(
+            "Error in StretchRect: {:#X} {}x{}",
+            ret,
+            width,
+            height
+        ));
     }
 
-    if device.EndScene() != 0 {
-        return Err(anyhow!("Error in EndScene: {:?}", ret));
+    let ret = device.EndScene();
+    if ret != 0 {
+        return Err(anyhow!("Error in EndScene: {:#X}", ret));
     }
 
-    if device.Present(null_mut(), null_mut(), null_mut(), null_mut()) != 0 {
-        return Err(anyhow!("Error in Present: {:?}", ret));
+    let ret = device.Present(null_mut(), null_mut(), null_mut(), null_mut());
+    if ret != 0 {
+        return Err(anyhow!("Error in Present: {:#X}", ret));
     }
     Ok(())
 }
@@ -712,7 +721,7 @@ extern "system" fn custom_wnd_proc(
                 let data = unsafe { raw_input.data.keyboard() };
                 /*
                 info!(
-                    "data {:x} {:x} {:x} {:x} {:x} {:x}",
+                    "data {:#X} {:#X} {:#X} {:#X} {:#X} {:#X}",
                     data.MakeCode,
                     data.Flags,
                     data.Reserved,
@@ -776,7 +785,7 @@ extern "system" fn custom_wnd_proc(
         WM_UPDATE_FRAME => {}
 
         WM_MOUSEMOVE => {
-            trace!("Move {:?} {:?} {:?} {:x?}", hwnd, msg, wparam, lparam);
+            trace!("Move {:?} {:?} {:?} {:#X}", hwnd, msg, wparam, lparam);
             let x = lparam & 0xFFFF;
             let y = lparam >> 16;
             let eventmove = tunnel::EventMove {
@@ -795,7 +804,7 @@ extern "system" fn custom_wnd_proc(
                 .expect("Error in send EventMove");
         }
         WM_LBUTTONDOWN | WM_MBUTTONDOWN | WM_RBUTTONDOWN => {
-            trace!("clickdown {:?} {:x} {:?} {:x?}", hwnd, msg, wparam, lparam);
+            trace!("clickdown {:?} {:#X} {:?} {:#X}", hwnd, msg, wparam, lparam);
             let x = lparam & 0xFFFF;
             let y = lparam >> 16;
             if msg & 0x200 != 0 {
@@ -826,7 +835,7 @@ extern "system" fn custom_wnd_proc(
             }
         }
         WM_LBUTTONUP | WM_MBUTTONUP | WM_RBUTTONUP => {
-            trace!("clickup {:?} {:x} {:?} {:x?}", hwnd, msg, wparam, lparam);
+            trace!("clickup {:?} {:#X} {:?} {:#X}", hwnd, msg, wparam, lparam);
             let x = lparam & 0xFFFF;
             let y = lparam >> 16;
             if msg & 0x200 != 0 {
@@ -857,7 +866,7 @@ extern "system" fn custom_wnd_proc(
             }
         }
         WM_MOUSEWHEEL => {
-            trace!("wheel {:?} {:x} {:x} {:x?}", hwnd, msg, wparam, lparam);
+            trace!("wheel {:?} {:#X} {:#X} {:#X}", hwnd, msg, wparam, lparam);
             let x = lparam & 0xFFFF;
             let y = lparam >> 16;
             let button = wparam as i32;
@@ -1481,7 +1490,7 @@ pub fn init_wind3d(
                         if let Some(window) = WIN_ID_TO_HANDLE.lock().unwrap().remove(&id) {
                             HANDLE_TO_WIN_ID.lock().unwrap().remove(&window);
                             //unsafe {DestroyWindow((*window) as *mut _)};
-                            info!("Del Window {:x}", window);
+                            info!("Del Window {:#X}", window);
                             unsafe { SendMessageA((window) as *mut _, WM_CLOSE, 0, 0) };
                         }
                     }
