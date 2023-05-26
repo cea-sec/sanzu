@@ -309,7 +309,7 @@ fn d3d11_get_device_idxgidevice(device: &d3d11::ID3D11Device) -> Result<&dxgi::I
         info!("Query interface success {:?}", p_idxgidevice);
     } else {
         error!("Error in queryinterface");
-        return Err(anyhow!("Error in query interface idxgidevice"));
+        return Err(anyhow!("Error in query interface idxgidevice: {:#X}", ret));
     }
     let p_idxgidevice: *mut dxgi::IDXGIDevice = unsafe { std::mem::transmute(p_idxgidevice) };
     unsafe { p_idxgidevice.as_ref() }.context("Null idxgiadapter")
@@ -337,7 +337,7 @@ fn d3d11_get_idxgidevice_idxgiadapter(
 
     if !SUCCEEDED(ret) {
         error!("Error in get parent idxgiadapter");
-        return Err(anyhow!("Error in get parent idxgiadapter"));
+        return Err(anyhow!("Error in get parent idxgiadapter: {:#X}", ret));
     }
     let p_idxgiadapter: *mut dxgi::IDXGIAdapter = unsafe { std::mem::transmute(p_idxgiadapter) };
     unsafe { p_idxgiadapter.as_ref() }.context("Null idxgiadapter")
@@ -365,7 +365,7 @@ fn d3d11_get_idxgioutput_idxgioutput1(
 
     if !SUCCEEDED(ret) {
         error!("Error in queryinterface idxgioutput1");
-        return Err(anyhow!("Error in get parent idxgioutput1"));
+        return Err(anyhow!("Error in get parent idxgioutput1: {:#X}", ret));
     }
     let p_idxgioutput1: *mut dxgi1_2::IDXGIOutput1 = unsafe { std::mem::transmute(p_idxgioutput1) };
     unsafe { p_idxgioutput1.as_ref() }.context("Null idxgioutput1")
@@ -391,7 +391,7 @@ fn d3d11_get_resource_texture2d(resource: &dxgi::IDXGIResource) -> Result<&d3d11
 
     if !SUCCEEDED(ret) {
         error!("Error in queryinterface id3d11texture2d");
-        return Err(anyhow!("Error in get parent id3d11texture2d"));
+        return Err(anyhow!("Error in get parent id3d11texture2d: {:#X}", ret));
     }
     let p_id3d11texture2d: *mut d3d11::ID3D11Texture2D =
         unsafe { std::mem::transmute(p_id3d11texture2d) };
@@ -418,7 +418,7 @@ fn d3d11_get_texture2d_surface(texture2d: &d3d11::ID3D11Texture2D) -> Result<&dx
 
     if !SUCCEEDED(ret) {
         error!("Error in queryinterface idxgisurface");
-        return Err(anyhow!("Error in get parent idxgisurface"));
+        return Err(anyhow!("Error in get parent idxgisurface: {:#X}", ret));
     }
     let p_idxgisurface: *mut dxgi::IDXGISurface = unsafe { std::mem::transmute(p_idxgisurface) };
     unsafe { p_idxgisurface.as_ref() }.context("Null idxgisurface")
@@ -712,7 +712,7 @@ pub fn init_d3d11() -> Result<()> {
                 d3d11_device.CreateTexture2D(&desc, null_mut(), &mut p_id3d11texture2d as *mut _)
             };
             if !SUCCEEDED(ret) {
-                return Err(anyhow!("Cannot create texture2d"));
+                return Err(anyhow!("Cannot create texture2d: {:#X}", ret));
             }
 
             P_TEXTURE2D.store(p_id3d11texture2d, atomic::Ordering::Release);
