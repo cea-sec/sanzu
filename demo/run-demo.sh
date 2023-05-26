@@ -97,7 +97,7 @@ then
         --name sanzu-demo-client sanzu-demo-client  || true
     else
         echo "RUN client with:"
-        echo "sanzu_client localhost 11498 --tls_server_name localhost  --tls_ca  ${TEMPDIR}/certs/rootCA.crt --client_cert  ${TEMPDIR}/certs/client1.crt  --client_key ${TEMPDIR}/certs/client1.key"
+        echo "sanzu_client localhost 11498 --tls-server-name localhost  --tls-ca  ${TEMPDIR}/certs/rootCA.crt --client-cert  ${TEMPDIR}/certs/client1.crt  --client-key ${TEMPDIR}/certs/client1.key"
         echo "Press ENTER to stop the server"
         read
     fi
@@ -105,7 +105,7 @@ else
   echo "Run server with : "
   echo "RUN client with: "
   echo "docker run -it --rm -v ${TEMPDIR}:/sanzu_demo/ -u `id -u`:`id -g`  --env SANZU_SERVER_IP=$SANZU_SERVER_IP --name sanzu-demo-client sanzu-demo-client"
-  echo "RUST_LOG=debug sanzu_client localhost 11498 --tls_server_name localhost  --tls_ca  ${TEMPDIR}/certs/rootCA.crt --client_cert  ${TEMPDIR}/certs/client-cert1.pem  --client_key ${TEMPDIR}/certs/client-key1.key"
+  echo "RUST_LOG=debug sanzu_client localhost 11498 --tls-server-name localhost  --tls-ca  ${TEMPDIR}/certs/rootCA.crt --client-cert  ${TEMPDIR}/certs/client-cert1.pem  --client-key ${TEMPDIR}/certs/client-key1.key"
   docker run -d --rm -v ${TEMPDIR}:/sanzu_demo/ -p 11498:11498 --env USER_UID=`id -u` --name sanzu-demo-server sanzu-demo-server
 
 fi

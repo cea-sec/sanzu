@@ -135,12 +135,12 @@ if __name__ == '__main__':
 
     server_args = [
         PATH_SANZU_SERVER,
-        "-u", "-c", "-l", args.unixsocket,
-        "-f", PATH_SANZU_CONFIG,
-        '-a',
-        '-s',
-        "-e", "libx264",
-        "-k", screen_path,
+        "--unixsock", "--connect-unixsock", "--address", args.unixsocket,
+        "--config", PATH_SANZU_CONFIG,
+        "--audio",
+        "--seamless",
+        "--encoder", "libx264",
+        "--extern-img-source", screen_path,
     ]
 
     run_daemon(
