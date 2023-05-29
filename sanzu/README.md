@@ -39,11 +39,11 @@ You can find more information on the architecture in `doc/architecture.md`.
 ```
 - Launch the server:
 ```
-  DISPLAY=:100 sanzu_server -f sanzu.toml
+  DISPLAY=:100 sanzu_server --config sanzu.toml
 ```
   or, if the server implements GPU encoding (h264_nvenc here):
 ```
-  DISPLAY=:100 sanzu_server -f sanzu.toml -e h264_nvenc
+  DISPLAY=:100 sanzu_server --config sanzu.toml --encoder h264_nvenc
 ```
 - On the server side, launch a window manager through X server
 ```
@@ -53,7 +53,7 @@ You can find more information on the architecture in `doc/architecture.md`.
 ```
   ./sanzu_client 192.168.0.1 1122
 ```
-By default, sound is disabled. To enable it, server and client should be launched with option "-a".
+By default, sound is disabled. To enable it, server and client should be launched with option "--audio".
 
 ## Replacement of ssh -Y
 If you have a server, let's say Rochefort, which runs a X server on the display :1234, you can access it with:
@@ -141,12 +141,12 @@ auth_key = "/home/user/certs/localhost.key"
 ```
 Run the server:
 ```
-   sanzu_server -f sanzu.toml -p 1122 -l 127.0.0.1
+   sanzu_server --config sanzu.toml --port 1122 --address 127.0.0.1
 ```
 
 And the client:
 ```
-   sanzu_client 127.0.0.1 1144 -a  -t ./certs/rootCA.crt -n localhost
+   sanzu_client 127.0.0.1 1144 --audio --tls-ca ./certs/rootCA.crt --tls-server-name localhost
 ```
 
 
