@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - extern-img-source short version is '-k' for all binaries
+- remove duplicate '-c' option for client/proxy/server
+- rename '--config_path' to '--args-config' for arguments config file
 ### Fixed
 - Remove default listen port for sanzu_proxy (resulting in vsock err)
 ### Removed

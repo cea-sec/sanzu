@@ -34,10 +34,10 @@ fn main() -> Result<()> {
     }
 
     let matches = ClientArgs::command().get_matches();
-    let config_path = matches.get_one::<std::path::PathBuf>("config_path");
+    let args_config = matches.get_one::<std::path::PathBuf>("args_config");
 
-    let mut layers = if let Some(config_path) = config_path {
-        vec![Layer::Toml(config_path.into())]
+    let mut layers = if let Some(args_config) = args_config {
+        vec![Layer::Toml(args_config.into())]
     } else {
         vec![]
     };
