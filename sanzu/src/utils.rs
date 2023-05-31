@@ -27,14 +27,14 @@ pub enum ClipboardConfig {
 pub struct ServerArgs {
     /// Config file
     #[clap(
-        long = "config_path",
+        long = "args-config",
         help = r"Path of toml file storing *arguments* configuration.
 Sanzu arguments can be set regarding this priority:
 - this configuration file
 - environment variable
 - command line"
     )]
-    pub config_path: Option<std::path::PathBuf>,
+    pub args_config: Option<std::path::PathBuf>,
 
     /// Rest of arguments
     #[clap(flatten)]
@@ -177,14 +177,14 @@ tcp or vsock"
 pub struct ClientArgs {
     /// Config file
     #[clap(
-        long = "config_path",
+        long = "args-config",
         help = r"Path of toml file storing *arguments* configuration.
 Sanzu arguments can be set regarding this priority:
 - this configuration file
 - environment variable
 - command line"
     )]
-    pub config_path: Option<std::path::PathBuf>,
+    pub args_config: Option<std::path::PathBuf>,
 
     /// Rest of arguments
     #[clap(flatten)]
@@ -321,14 +321,14 @@ without being interpreted by the local window manager"
 pub struct ProxyArgs {
     /// Config file
     #[clap(
-        long = "config_path",
+        long = "args-config",
         help = r"Path of toml file storing *arguments* configuration.
 Sanzu arguments can be set regarding this priority:
 - this configuration file
 - environment variable
 - command line"
     )]
-    pub config_path: Option<std::path::PathBuf>,
+    pub args_config: Option<std::path::PathBuf>,
 
     /// Rest of arguments
     #[clap(flatten)]
