@@ -27,7 +27,6 @@ pub enum ClipboardConfig {
 pub struct ServerArgs {
     /// Config file
     #[clap(
-        short,
         long = "config_path",
         help = r"Path of toml file storing *arguments* configuration.
 Sanzu arguments can be set regarding this priority:
@@ -178,7 +177,6 @@ tcp or vsock"
 pub struct ClientArgs {
     /// Config file
     #[clap(
-        short,
         long = "config_path",
         help = r"Path of toml file storing *arguments* configuration.
 Sanzu arguments can be set regarding this priority:
@@ -323,7 +321,6 @@ without being interpreted by the local window manager"
 pub struct ProxyArgs {
     /// Config file
     #[clap(
-        short,
         long = "config_path",
         help = r"Path of toml file storing *arguments* configuration.
 Sanzu arguments can be set regarding this priority:
