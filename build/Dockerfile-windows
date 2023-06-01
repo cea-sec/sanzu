@@ -24,32 +24,45 @@ RUN set -eux; \
       unzip \
       sudo \
       git \
-      fakeroot; \
+      fakeroot;
+
+RUN set -eux; \
     useradd -ms /bin/bash builduser ; \
     passwd -d builduser ; \
     printf 'builduser ALL=(ALL) ALL\n' | tee -a /etc/sudoers ; \
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path ; \
     rustup target add x86_64-pc-windows-gnu ; \
-    rustup toolchain install stable-x86_64-pc-windows-gnu ; \
-    for lib in SECUR32 KERNEL32 OLEAUT32 OLE32 ; do ln -s /usr/x86_64-w64-mingw32/lib/lib${lib,,}.a /usr/x86_64-w64-mingw32/lib/lib${lib}.a ; done ; \
+    rustup toolchain install  --force-non-host stable-x86_64-pc-windows-gnu ; \
+    for lib in SECUR32 KERNEL32 OLEAUT32 OLE32 ; do ln -s /usr/x86_64-w64-mingw32/lib/lib${lib,,}.a /usr/x86_64-w64-mingw32/lib/lib${lib}.a ; done
+
+RUN set -eux; \
     pacman -S --noconfirm \
       libxtst \
       libxext \
       ffmpeg \
       libxdamage \
       libxfixes \
-      curl ; \      
-    cd /tmp/ ; \
-    curl -L -o /tmp/ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n4.4-latest-win64-gpl-shared-4.4.zip ; \
+      curl ; \
+    cd /tmp ; \
+    curl -L -o /tmp/ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n6.0-latest-win64-gpl-shared-6.0.zip ; \
     unzip /tmp/ffmpeg.zip ; cd /tmp/ffmpeg*/bin/ ; \
     for lib in *.dll ; do echo ${lib} ; \
         cp $lib /usr/x86_64-w64-mingw32/lib/${lib} ; \
         ln -s /usr/x86_64-w64-mingw32/lib/${lib} /usr/x86_64-w64-mingw32/lib/${lib/-*.dll/.dll} ; \
-    done; \
+    done;
+
+
+RUN set -eux; \
+    sudo  bash -c "echo 'Defaults env_keep += \"ftp_proxy http_proxy https_proxy no_proxy\"' >> /etc/sudoers" ; \
+    sudo cat /etc/sudoers
+
+RUN set -eux; \
     cd /tmp ; \
-    sudo --preserve-env=https_proxy -u builduser bash -c 'git clone https://aur.archlinux.org/aurman.git ; cd aurman ; \
-            makepkg --skippgpcheck --noconfirm -si' ;  \
-    sudo --preserve-env=https_proxy --preserve-env=http_proxy -u builduser bash -c 'aurman --noconfirm  --skip_news --noedit -S mingw-w64-opus' ;
+    sudo -u builduser bash -c 'git clone https://aur.archlinux.org/pikaur.git ; cd pikaur ; \
+            makepkg --noconfirm -si'
+
+RUN set -eux; \
+    sudo -u builduser bash -c 'pikaur --noconfirm --noedit -S mingw-w64-opus' ;
 
 
 WORKDIR /SRC
