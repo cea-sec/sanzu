@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] - 2023-05-31
+
 ### Changed
 - extern-img-source short version is '-k' for all binaries
 - remove duplicate '-c' option for client/proxy/server
