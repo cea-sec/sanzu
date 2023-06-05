@@ -1,6 +1,7 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use byteorder::{BigEndian, ByteOrder};
 use std::net::IpAddr;
+use std::time::Duration;
 
 use clap::{CommandFactory, Parser};
 use twelf::config;
@@ -166,6 +167,8 @@ tcp or vsock"
         help = "Loop if client disconnect instead of quitting"
     )]
     pub keep_listening: bool,
+    #[clap(long, help = "Add connection timeout (seconds)")]
+    pub connection_timeout: Option<u32>,
     #[clap(long, help = "Displays protocol version")]
     pub proto: bool,
     #[clap(short='v', long, action = clap::ArgAction::Count)]
@@ -310,6 +313,8 @@ This allows (linux) sending special keys like alt-tab
 without being interpreted by the local window manager"
     )]
     pub grab_keyboard: bool,
+    #[clap(long, help = "Add connection timeout (seconds)")]
+    pub connection_timeout: Option<u32>,
     #[clap(long, help = "Displays protocol version")]
     pub proto: bool,
     #[clap(short='v', long, action = clap::ArgAction::Count)]
@@ -408,6 +413,8 @@ pub struct ProxyArgsConfig {
     )]
     pub disable_server_clipboard: bool,
     pub keep_listening: bool,
+    #[clap(long, help = "Add connection timeout (seconds)")]
+    pub connection_timeout: Option<u32>,
     #[clap(long, help = "Displays protocol version")]
     pub proto: bool,
     #[clap(short='v', long, action = clap::ArgAction::Count)]
@@ -516,3 +523,33 @@ pub fn is_proto_arg() -> bool {
     }
     false
 }
+
+pub trait HasTimeout {
+    /// Set Read/Write timeout on socket
+    fn set_connection_timeout(&self, timeout: Option<Duration>) -> Result<()>;
+}
+
+macro_rules! set_connection_timeout {
+    (
+        $target: ty
+    ) => {
+        impl HasTimeout for $target {
+            fn set_connection_timeout(&self, timeout: Option<Duration>) -> Result<()> {
+                self.set_read_timeout(timeout)
+                    .context("Cannot set read timeout")?;
+                self.set_write_timeout(timeout)
+                    .context("Cannot set read timeout")
+            }
+        }
+    };
+}
+
+set_connection_timeout!(std::net::TcpStream);
+
+#[cfg(unix)]
+set_connection_timeout!(std::os::unix::net::UnixStream);
+
+#[cfg(unix)]
+use vsock;
+#[cfg(unix)]
+set_connection_timeout!(vsock::VsockStream);

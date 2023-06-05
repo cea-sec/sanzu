@@ -34,7 +34,7 @@ use crate::config::AuthType;
 use crate::{
     config::{ConfigServer, ConfigTls},
     sound::SoundEncoder,
-    utils::{ServerArgsConfig, ServerEvent},
+    utils::{HasTimeout, ServerArgsConfig, ServerEvent},
     video_encoder::{get_encoder_category, init_video_encoder, Encoder},
 };
 use rustls::ServerConnection;
@@ -123,7 +123,9 @@ pub fn run(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result<()> {
 /// - receive / handle client events
 pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result<()> {
     info!("Start server");
-
+    let connection_timeout = arguments
+        .connection_timeout
+        .map(|timeout| std::time::Duration::from_secs(timeout as u64));
     let mut sock: Box<dyn ReadWrite> = match (arguments.vsock, arguments.stdio, arguments.unixsock)
     {
         (true, false, false) => {
@@ -141,6 +143,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
                     .context(format!("Error in VsockListener {address} {port}"))?;
                 let (socket, addr) = listener.accept().context("failed to accept connection")?;
                 info!("Client {:?}", addr);
+                socket
+                    .set_connection_timeout(connection_timeout)
+                    .context("Cannot set timeout")?;
                 Box::new(socket)
             }
             #[cfg(windows)]
@@ -160,6 +165,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
                     info!("Client {:?}", addr);
                     socket
                 };
+                socket
+                    .set_connection_timeout(connection_timeout)
+                    .context("Cannot set timeout")?;
                 Box::new(socket)
             }
             #[cfg(windows)]
@@ -191,6 +199,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
                 .accept()
                 .context(format!("Error in TcpListener {address} {port}"))?;
             socket.set_nodelay(true)?;
+            socket
+                .set_connection_timeout(connection_timeout)
+                .context("Cannot set timeout")?;
             info!("Client {:?}", addr);
             Box::new(socket)
         }

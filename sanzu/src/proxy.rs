@@ -4,7 +4,8 @@ use crate::{
     config::ConfigServer,
     sound::{encode_sound, SOUND_FREQ},
     utils::{
-        get_xwd_data, ProxyArgsConfig, MAX_BYTES_PER_LINE, MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
+        get_xwd_data, HasTimeout, ProxyArgsConfig, MAX_BYTES_PER_LINE, MAX_WINDOW_HEIGHT,
+        MAX_WINDOW_WIDTH,
     },
     video_encoder::{get_encoder_category, init_video_encoder},
 };
@@ -153,6 +154,9 @@ pub fn run(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<()> {
 
 pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<()> {
     let codec_name = get_encoder_category(&arguments.encoder)?;
+    let connection_timeout = arguments
+        .connection_timeout
+        .map(|timeout| std::time::Duration::from_secs(timeout as u64));
 
     let mut sound_encoder = opus::Encoder::new(
         SOUND_FREQ,
@@ -190,11 +194,17 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
                 let (client, addr) = listener.accept().context("failed to accept connection")?;
                 info!("Client {:?}", addr);
                 client.set_nodelay(true).context("Error in set_nodelay")?;
+                client
+                    .set_connection_timeout(connection_timeout)
+                    .context("Cannot set timeout")?;
                 Box::new(client)
             }
             (None, Some(unix_socket)) => {
                 let client = UnixStream::connect(unix_socket)
                     .context(format!("Error in connect to unix socket {unix_socket:?}"))?;
+                client
+                    .set_connection_timeout(connection_timeout)
+                    .context("Cannot set timeout")?;
                 Box::new(client)
             }
             _ => {
@@ -215,6 +225,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
         let server = vsock::VsockStream::connect(&vsock::VsockAddr::new(address, port)).context(
             format!("Error in vsock server connection {address:?} {port:?}"),
         )?;
+        server
+            .set_connection_timeout(connection_timeout)
+            .context("Cannot set timeout")?;
         info!("Connected to server");
         Box::new(server)
     } else {
@@ -225,6 +238,9 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
         let destination = format!("{}:{}", arguments.server_addr, port);
         let server = TcpStream::connect(&destination)
             .context(format!("Error in tcp server connection {destination:?}"))?;
+        server
+            .set_connection_timeout(connection_timeout)
+            .context("Cannot set timeout")?;
         info!("Connected to server");
         server.set_nodelay(true).expect("set_nodelay call failed");
         Box::new(server)
