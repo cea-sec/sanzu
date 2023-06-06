@@ -29,8 +29,8 @@ use crate::{
     //proto::{Tunnel, ReadWrite},
     sound::SoundDecoder,
     utils::{
-        get_xwd_data, ClientArgsConfig, MAX_BYTES_PER_LINE, MAX_CURSOR_HEIGHT, MAX_CURSOR_WIDTH,
-        MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
+        get_xwd_data, ClientArgsConfig, HasTimeout, MAX_BYTES_PER_LINE, MAX_CURSOR_HEIGHT,
+        MAX_CURSOR_WIDTH, MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
     },
     video_decoder::init_video_codec,
 };
@@ -203,6 +203,10 @@ pub fn do_run(
         None => (false, 0),
     };
 
+    let connection_timeout = arguments
+        .connection_timeout
+        .map(|timeout| std::time::Duration::from_secs(timeout as u64));
+
     let mut socket: Box<dyn ReadWrite> = match &arguments.proxycommand {
         None => {
             #[cfg(unix)]
@@ -216,6 +220,9 @@ pub fn do_run(
                     .context(format!(
                         "Error in vsock server connection {address:?} {port:?}"
                     ))?;
+                server
+                    .set_connection_timeout(connection_timeout)
+                    .context("Cannot set timeout")?;
                 info!("Connected to server");
                 Box::new(server)
             } else {
@@ -223,6 +230,9 @@ pub fn do_run(
                 let destination = format!("{}:{}", arguments.server_addr, port);
                 let server = TcpStream::connect(&destination)
                     .context(format!("Error in tcp server connection {destination:?}"))?;
+                server
+                    .set_connection_timeout(connection_timeout)
+                    .context("Cannot set timeout")?;
                 info!("Connected to server");
                 server.set_nodelay(true).expect("set_nodelay call failed");
                 Box::new(server)
@@ -233,6 +243,9 @@ pub fn do_run(
                 let destination = format!("{}:{}", arguments.server_addr, port);
                 let server = TcpStream::connect(&destination)
                     .context(format!("Error in tcp server connection {destination:?}"))?;
+                server
+                    .set_connection_timeout(connection_timeout)
+                    .context("Cannot set timeout")?;
                 info!("Connected to server");
                 server.set_nodelay(true).expect("set_nodelay call failed");
                 Box::new(server)
