@@ -173,6 +173,8 @@ tcp or vsock"
     pub proto: bool,
     #[clap(short='v', long, action = clap::ArgAction::Count)]
     pub verbose: u8,
+    #[clap(long, default_value_t = 96, help = "Simulated dpi for server screen")]
+    pub dpi: u32,
 }
 
 #[derive(Parser, Debug)]

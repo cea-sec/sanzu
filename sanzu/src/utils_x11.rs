@@ -166,6 +166,12 @@ pub fn delete_video_mode_by_name<C: Connection>(
     Ok(None)
 }
 
+/// Convert pixels to mm regarding a given dpi
+/// 1 inch = 25.4mm
+fn pixels_to_mm(pixels: u32, dpi: u32) -> u32 {
+    ((pixels as f32) * 25.4) as u32 / dpi
+}
+
 /// Add video mode
 /// Size: (width x height)
 /// If we cannot add video mode, clearn the state by removing the dummy mode by name
@@ -176,8 +182,12 @@ pub fn add_video_mode<C: Connection>(
     height: u16,
     name: &str,
     id: usize,
+    dpi: u32,
 ) -> Result<u32> {
-    debug!("Add_video_mode {}x{} {:?} {}", width, height, name, id);
+    debug!(
+        "Add_video_mode {}x{} {:?} {} dpi: {}",
+        width, height, name, id, dpi
+    );
     let id = id as u32 + 300;
     // Only width / height seems to be used, default other values
     let mode = randr::ModeInfo {
@@ -239,19 +249,21 @@ pub fn add_video_mode<C: Connection>(
     randr::add_output_mode(conn, output_mode, mode_id).context("Error in add_output_mode")?;
 
     // Set video mode
-    set_video_mode(conn, window, mode_id).context("Error inset_video_mode")?;
+    set_video_mode(conn, window, mode_id, dpi).context("Error inset_video_mode")?;
     debug!("Set video mode ok");
     conn.flush().context("Error in x11rb flush")?;
 
     debug!("Set screen size");
-    randr::set_screen_size(conn, window, width, height, width as u32, height as u32)
+    let screen_width = pixels_to_mm(width as u32, dpi);
+    let screen_height = pixels_to_mm(height as u32, dpi);
+    randr::set_screen_size(conn, window, width, height, screen_width, screen_height)
         .context("cannot set screen size")?;
 
     Ok(mode_id)
 }
 
 /// Set video mode with id @mode
-pub fn set_video_mode<C: Connection>(conn: &C, window: Window, mode: u32) -> Result<()> {
+pub fn set_video_mode<C: Connection>(conn: &C, window: Window, mode: u32, dpi: u32) -> Result<()> {
     debug!("Set_video_mode {}", mode);
     let screen_resources = randr::get_screen_resources_current(conn, window)
         .context("Error in get_screen_resources")?
@@ -302,7 +314,9 @@ pub fn set_video_mode<C: Connection>(conn: &C, window: Window, mode: u32) -> Res
             .context("Error in set_crtc_config")?
             .reply()
             .context("Error in set_crtc_config check")?;
-        randr::set_screen_size(conn, window, width, height, width as u32, height as u32)
+        let screen_width = pixels_to_mm(width as u32, dpi);
+        let screen_height = pixels_to_mm(height as u32, dpi);
+        randr::set_screen_size(conn, window, width, height, screen_width, screen_height)
             .context("cannot set screen size")?;
 
         debug!(
