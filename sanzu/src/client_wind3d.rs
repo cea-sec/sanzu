@@ -246,6 +246,7 @@ impl ClientWindows {
         clipboard_config: ClipboardConfig,
         printdir: Option<String>,
         sync_key_locks: bool,
+        window_mode: bool,
     ) -> (
         ClientWindows,
         FrameReceiver,
@@ -267,10 +268,15 @@ impl ClientWindows {
         let (width, height) = match server_size {
             Some((width, height)) => (width, height),
             None => {
-                let width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
-                let height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
+                let mut width = unsafe { GetSystemMetrics(SM_CXSCREEN) };
+                let mut height = unsafe { GetSystemMetrics(SM_CYSCREEN) };
 
-                //let (width, height) = (640, 480); ////(Monitor::width(), Monitor::height());
+                if window_mode {
+                    // Default size in window mode is 3/4 of the screen
+                    width = width * 3 / 4;
+                    height = height * 3 / 4
+                }
+
                 (width as u16, height as u16)
             }
         };
@@ -1217,6 +1223,7 @@ pub fn init_wind3d(
         clipboard_config,
         arguments.allow_print.clone(),
         arguments.sync_key_locks,
+        arguments.window_mode,
     );
     let (screen_width, screen_height) = (client_info.width, client_info.height);
     let window_mode = arguments.window_mode;
