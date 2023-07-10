@@ -39,7 +39,7 @@ use winapi::{
             D3DPRESENT_PARAMETERS, D3DSWAPEFFECT_DISCARD, D3DTEXF_NONE,
         },
         minwindef::{DWORD, LPARAM, LRESULT, TRUE, UINT, WPARAM},
-        windef::{HWND, HWND__, POINT, RECT},
+        windef::{HHOOK__, HWND, HWND__, POINT, RECT},
     },
     um::{
         libloaderapi::{GetModuleHandleA, GetProcAddress, LoadLibraryA},
@@ -51,18 +51,18 @@ use winapi::{
             RGNDATAHEADER, RGN_OR,
         },
         winuser::{
-            CreateIconIndirect, CreateWindowExA, DefWindowProcA, DestroyIcon, DestroyWindow,
-            DispatchMessageA, GetCursorPos, GetDC, GetRawInputData, GetSystemMetrics, LoadImageA,
-            PeekMessageA, PostQuitMessage, RegisterClassExA, RegisterRawInputDevices, ReleaseDC,
-            SendMessageA, SetClipboardViewer, SetCursor, SetFocus, SetWindowRgn, SetWindowsHookExA,
-            TranslateMessage, ICONINFO, ICON_BIG, IMAGE_ICON, LR_DEFAULTSIZE, LR_LOADFROMFILE, MSG,
-            PM_REMOVE, PRAWINPUT, RAWINPUT, RAWINPUTDEVICE, RAWINPUTHEADER, RIDEV_NOLEGACY,
-            RID_INPUT, RIM_TYPEKEYBOARD, SM_CXSCREEN, SM_CYSCREEN, SW_HIDE, WH_MOUSE_LL,
-            WM_ACTIVATE, WM_CHANGECBCHAIN, WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE,
-            WM_DRAWCLIPBOARD, WM_INPUT, WM_KILLFOCUS, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
-            WM_MBUTTONUP, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP,
-            WM_SETFOCUS, WM_SETICON, WM_SIZE, WM_USER, WNDCLASSEXA, WS_CLIPCHILDREN,
-            WS_CLIPSIBLINGS, WS_DLGFRAME, WS_MAXIMIZE, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE,
+            CallNextHookEx, CreateIconIndirect, CreateWindowExA, DefWindowProcA, DestroyIcon,
+            DestroyWindow, DispatchMessageA, GetCursorPos, GetDC, GetSystemMetrics, LoadImageA,
+            PeekMessageA, PostQuitMessage, RegisterClassExA, ReleaseDC, SendMessageA,
+            SetClipboardViewer, SetCursor, SetFocus, SetWindowRgn, SetWindowsHookExA,
+            TranslateMessage, UnhookWindowsHookEx, HC_ACTION, ICONINFO, ICON_BIG, IMAGE_ICON,
+            LPKBDLLHOOKSTRUCT, LR_DEFAULTSIZE, LR_LOADFROMFILE, MSG, PM_REMOVE, SM_CXSCREEN,
+            SM_CYSCREEN, SW_HIDE, WH_KEYBOARD_LL, WH_MOUSE_LL, WM_ACTIVATE, WM_CHANGECBCHAIN,
+            WM_CLOSE, WM_DESTROY, WM_DISPLAYCHANGE, WM_DRAWCLIPBOARD, WM_KEYDOWN, WM_KILLFOCUS,
+            WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEMOVE,
+            WM_MOUSEWHEEL, WM_QUIT, WM_RBUTTONDOWN, WM_RBUTTONUP, WM_SETFOCUS, WM_SETICON, WM_SIZE,
+            WM_SYSKEYDOWN, WM_USER, WNDCLASSEXA, WS_CLIPCHILDREN, WS_CLIPSIBLINGS, WS_DLGFRAME,
+            WS_MAXIMIZE, WS_OVERLAPPEDWINDOW, WS_POPUP, WS_VISIBLE,
         },
     },
 };
@@ -87,6 +87,8 @@ lazy_static! {
     static ref MSG_SENDER: Mutex<Option<Sender<u64>>> = Mutex::new(None);
     static ref SKIP_CLIPBOARD: Mutex<u32> = Mutex::new(0);
     static ref SYNC_KEY_LOCKS_NEEDED: Mutex<bool> = Mutex::new(false);
+    static ref GRAB_KEYBOARD: Mutex<bool> = Mutex::new(false);
+    static ref GRAB_KEYBOARD_ID: atomic::AtomicPtr<HHOOK__> = atomic::AtomicPtr::new(null_mut());
 }
 
 /// Windows keycodes come from raw usb hid keycodes,
@@ -97,6 +99,7 @@ const KEY_SHIFT: usize = 50;
 const KEY_ALT: usize = 64;
 const KEY_S: usize = 39;
 const KEY_C: usize = 54;
+const KEY_H: usize = 43;
 
 const WM_UPDATE_FRAME: UINT = WM_USER + 1;
 const WM_WTSSESSION_CHANGE: DWORD = 0x2B1;
@@ -620,13 +623,14 @@ extern "system" fn custom_wnd_proc_sub(
 ) -> LRESULT {
     match msg {
         WM_SETFOCUS => {
-            info!("got focus {:?}", hwnd);
+            trace!("got focus {:?}", hwnd);
         }
         WM_KILLFOCUS => {
-            info!("lost focus {:?}", hwnd);
+            trace!("lost focus {:?}", hwnd);
         }
+
         WM_ACTIVATE => {
-            info!("activate {:?}", hwnd);
+            trace!("activate {:?}", hwnd);
             if let Some(id) = HANDLE_TO_WIN_ID.lock().unwrap().get(&(hwnd as u64)) {
                 let eventwinactivate = tunnel::EventWinActivate { id: *id as u32 };
                 let msg_event = tunnel::MessageClient {
@@ -657,6 +661,28 @@ extern "system" fn custom_wnd_proc_sub(
     }
     unsafe { DefWindowProcA(hwnd, msg, wparam, lparam) }
 }
+fn release_keys() {
+    /* On focus out, release each pushed keys */
+    for (index, key_state) in KEYS_STATE.lock().unwrap().iter_mut().enumerate() {
+        if *key_state {
+            *key_state = false;
+            let eventkey = tunnel::EventKey {
+                keycode: index as u32,
+                updown: false,
+            };
+            let msg_event = tunnel::MessageClient {
+                msg: Some(tunnel::message_client::Msg::Key(eventkey)),
+            };
+            EVENT_SENDER
+                .lock()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .send(msg_event)
+                .expect("Error in send key_state");
+        }
+    }
+}
 
 extern "system" fn custom_wnd_proc(
     hwnd: HWND,
@@ -670,122 +696,15 @@ extern "system" fn custom_wnd_proc(
             // If caps/num/scroll locks have changed during out of focus,
             // force keys state synchro
             *SYNC_KEY_LOCKS_NEEDED.lock().unwrap() = true;
+            *GRAB_KEYBOARD.lock().unwrap() = true;
+            grab_keyboard();
         }
         WM_KILLFOCUS => {
             trace!("lost focus");
-            /* On focus out, release each pushed keys */
-            for (index, key_state) in KEYS_STATE.lock().unwrap().iter_mut().enumerate() {
-                if *key_state {
-                    *key_state = false;
-                    let eventkey = tunnel::EventKey {
-                        keycode: index as u32,
-                        updown: false,
-                    };
-                    let msg_event = tunnel::MessageClient {
-                        msg: Some(tunnel::message_client::Msg::Key(eventkey)),
-                    };
-                    EVENT_SENDER
-                        .lock()
-                        .unwrap()
-                        .as_ref()
-                        .unwrap()
-                        .send(msg_event)
-                        .expect("Error in send key_state");
-                }
-            }
-        }
-        WM_INPUT => {
-            let mut dwsize = 0u32;
-            unsafe {
-                GetRawInputData(
-                    lparam as *mut _,
-                    RID_INPUT,
-                    null_mut(),
-                    &mut dwsize as *mut _,
-                    std::mem::size_of::<RAWINPUTHEADER>() as u32,
-                );
-            };
 
-            let mut data = vec![0u8; dwsize as usize];
-            let data_ptr = data.as_mut_ptr();
-
-            unsafe {
-                let ret = GetRawInputData(
-                    lparam as *mut _,
-                    RID_INPUT,
-                    data_ptr as *mut _,
-                    &mut dwsize as *mut _,
-                    std::mem::size_of::<RAWINPUTHEADER>() as u32,
-                );
-                assert!(ret == dwsize as u32);
-            };
-
-            let raw_input_ptr: PRAWINPUT = data_ptr as *mut _;
-            let raw_input: RAWINPUT = unsafe { *raw_input_ptr };
-            let raw_input_hdr = raw_input.header;
-            let result = if raw_input_hdr.dwType == RIM_TYPEKEYBOARD {
-                let data = unsafe { raw_input.data.keyboard() };
-                /*
-                info!(
-                    "data {:#X} {:#X} {:#X} {:#X} {:#X} {:#X}",
-                    data.MakeCode,
-                    data.Flags,
-                    data.Reserved,
-                    data.VKey,
-                    data.Message,
-                    data.ExtraInformation
-                );
-                 */
-
-                let key_code = utils_win::hid_code_to_hardware_keycode(
-                    data.MakeCode as u32,
-                    data.Flags as u32,
-                    data.VKey as u32,
-                );
-                let updown = data.Message & 1 == 0;
-                (key_code, updown)
-            } else {
-                (None, true)
-            };
-            if let (Some(keycode), updown) = result {
-                KEYS_STATE.lock().unwrap()[keycode as usize] = updown;
-                let eventkey = tunnel::EventKey {
-                    keycode: keycode as u32,
-                    updown,
-                };
-
-                // If Ctrl alt shift s => Generate toggle server logs
-                if keycode == KEY_S as u16 && updown {
-                    // Ctrl Shift Alt
-                    let keys_state = KEYS_STATE.lock().unwrap();
-                    if keys_state[KEY_CTRL] && keys_state[KEY_SHIFT] && keys_state[KEY_ALT] {
-                        let display_stats = DISPLAY_STATS.load(atomic::Ordering::Acquire);
-                        DISPLAY_STATS.store(!display_stats, atomic::Ordering::Release);
-                        info!("Toggle server logs");
-                    }
-                }
-
-                // If Ctrl alt shift c => Trig clipboard event
-                if keycode == KEY_C as u16 && updown {
-                    // Ctrl Shift Alt
-                    let keys_state = KEYS_STATE.lock().unwrap();
-                    if keys_state[KEY_CTRL] && keys_state[KEY_SHIFT] && keys_state[KEY_ALT] {
-                        CLIPBOARD_TRIG.store(true, atomic::Ordering::Release);
-                    }
-                }
-
-                let msg_event = tunnel::MessageClient {
-                    msg: Some(tunnel::message_client::Msg::Key(eventkey)),
-                };
-                EVENT_SENDER
-                    .lock()
-                    .unwrap()
-                    .as_ref()
-                    .unwrap()
-                    .send(msg_event)
-                    .expect("Error in send key_state");
-            }
-            drop(data);
+            *GRAB_KEYBOARD.lock().unwrap() = false;
+            ungrab_keyboard();
+            release_keys();
         }
 
         WM_UPDATE_FRAME => {}
@@ -1001,7 +920,7 @@ extern "system" fn custom_wnd_proc(
     unsafe { DefWindowProcA(hwnd, msg, wparam, lparam) }
 }
 
-extern "system" fn hook_callback(_code: i32, w_param: u64, _l_param: i64) -> i64 {
+extern "system" fn hook_callback_mouse(_code: i32, w_param: u64, _l_param: i64) -> i64 {
     let mut pos = POINT::default();
     unsafe {
         GetCursorPos(&mut pos as *mut _);
@@ -1056,6 +975,89 @@ extern "system" fn hook_callback(_code: i32, w_param: u64, _l_param: i64) -> i64
 
     0
 }
+
+extern "system" fn hook_callback_keyboard(code: i32, w_param: u64, l_param: i64) -> i64 {
+    if code == HC_ACTION {
+        let hooked: LPKBDLLHOOKSTRUCT = unsafe { std::mem::transmute(l_param) };
+
+        if let Some(hooked) = unsafe { hooked.as_ref() } {
+            let result = {
+                let key_code = utils_win::windows_scancode_to_hardware_keycode(
+                    hooked.scanCode as u32,
+                    hooked.flags & 3 as u32,
+                );
+                let updown = w_param == WM_KEYDOWN as u64 || w_param == WM_SYSKEYDOWN as u64;
+                (key_code, updown)
+            };
+            if let (Some(keycode), updown) = result {
+                KEYS_STATE.lock().unwrap()[keycode as usize] = updown;
+                let eventkey = tunnel::EventKey {
+                    keycode: keycode as u32,
+                    updown,
+                };
+
+                // If Ctrl alt shift s => Generate toggle server logs
+                if keycode == KEY_S as u16 && updown {
+                    // Ctrl Shift Alt
+                    let keys_state = KEYS_STATE.lock().unwrap();
+                    if keys_state[KEY_CTRL] && keys_state[KEY_SHIFT] && keys_state[KEY_ALT] {
+                        let display_stats = DISPLAY_STATS.load(atomic::Ordering::Acquire);
+                        DISPLAY_STATS.store(!display_stats, atomic::Ordering::Release);
+                        info!("Toggle server logs");
+                    }
+                }
+
+                // If Ctrl alt shift c => Trig clipboard event
+                if keycode == KEY_C as u16 && updown {
+                    // Ctrl Shift Alt
+                    let keys_state = KEYS_STATE.lock().unwrap();
+                    if keys_state[KEY_CTRL] && keys_state[KEY_SHIFT] && keys_state[KEY_ALT] {
+                        CLIPBOARD_TRIG.store(true, atomic::Ordering::Release);
+                    }
+                }
+
+                // If Ctrl alt shift h => toggle grab keyboard
+                if keycode == KEY_H as u16 && updown {
+                    // Ctrl Shift Alt
+                    let is_ctrl_alt_shift = {
+                        let keys_state = KEYS_STATE.lock().unwrap();
+                        keys_state[KEY_CTRL] && keys_state[KEY_SHIFT] && keys_state[KEY_ALT]
+                    };
+                    if is_ctrl_alt_shift {
+                        let mut grab_keyboard = GRAB_KEYBOARD.lock().unwrap();
+                        *grab_keyboard = !*grab_keyboard;
+
+                        if !*grab_keyboard {
+                            release_keys();
+                            ungrab_keyboard();
+                        }
+
+                        info!("Toggle ungrab Keyboard {}", *grab_keyboard);
+                    }
+                }
+
+                if *GRAB_KEYBOARD.lock().unwrap() {
+                    let msg_event = tunnel::MessageClient {
+                        msg: Some(tunnel::message_client::Msg::Key(eventkey)),
+                    };
+                    EVENT_SENDER
+                        .lock()
+                        .unwrap()
+                        .as_ref()
+                        .unwrap()
+                        .send(msg_event)
+                        .expect("Error in send key_state");
+                }
+            }
+            if *GRAB_KEYBOARD.lock().unwrap() {
+                return 1;
+            }
+        }
+    }
+
+    unsafe { CallNextHookEx(null_mut(), code, w_param as usize, l_param as isize) as i64 }
+}
+
 /// Set the client cursor
 fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yhot: i32) {
     debug!(
@@ -1197,6 +1199,21 @@ fn set_window_cursor(cursor_data: &[u8], width: u32, height: u32, xhot: i32, yho
     }
 }
 
+fn grab_keyboard() {
+    let ptr = hook_callback_keyboard as *const ();
+    let function: unsafe extern "system" fn(code: i32, wParam: usize, lParam: isize) -> isize =
+        unsafe { std::mem::transmute(ptr) };
+
+    let instance_handle = unsafe { GetModuleHandleA(null_mut()) };
+    let hook_id = unsafe { SetWindowsHookExA(WH_KEYBOARD_LL, Some(function), instance_handle, 0) };
+    GRAB_KEYBOARD_ID.store(hook_id, atomic::Ordering::Release);
+}
+
+fn ungrab_keyboard() {
+    unsafe { UnhookWindowsHookEx(GRAB_KEYBOARD_ID.load(atomic::Ordering::Acquire)) };
+    GRAB_KEYBOARD_ID.store(null_mut(), atomic::Ordering::Release);
+}
+
 pub fn init_wind3d(
     arguments: &ClientArgsConfig,
     mut seamless: bool,
@@ -1233,24 +1250,6 @@ pub fn init_wind3d(
         seamless = false;
     }
     EVENT_SENDER.lock().unwrap().replace(event_sender);
-
-    let mut x = RAWINPUTDEVICE {
-        usUsagePage: 1,
-        usUsage: 6,
-        dwFlags: RIDEV_NOLEGACY,
-        hwndTarget: null_mut(),
-    };
-
-    unsafe {
-        if RegisterRawInputDevices(
-            &mut x as *mut _,
-            1,
-            std::mem::size_of::<RAWINPUTDEVICE>() as u32,
-        ) == 0
-        {
-            return Err(anyhow!("Error in RegisterRawInputDevices"));
-        }
-    };
 
     let (window_sender, window_receiver) = channel();
     WINDOW_SENDER.lock().unwrap().replace(window_sender);
@@ -1345,7 +1344,7 @@ pub fn init_wind3d(
         info!("Init d3d ok");
 
         if !window_mode {
-            let ptr = hook_callback as *const ();
+            let ptr = hook_callback_mouse as *const ();
             let function: unsafe extern "system" fn(
                 code: i32,
                 wParam: usize,
@@ -1354,6 +1353,9 @@ pub fn init_wind3d(
 
             let _hook_id = unsafe { SetWindowsHookExA(WH_MOUSE_LL, Some(function), null_mut(), 0) };
         }
+
+        grab_keyboard();
+
         /* Register class for subwindows */
         let class_name = CString::new("subwindows_class").expect("Error in create CString D3D");
         let class_name_ptr = class_name.as_ptr();

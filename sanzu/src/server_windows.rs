@@ -955,7 +955,7 @@ impl Server for ServerInfo {
                 }
                 Some(tunnel::message_client::Msg::Key(event)) => {
                     if let Some((keycode, extened)) =
-                        utils_win::hardware_keycode_to_hid_code(event.keycode)
+                        utils_win::hardware_keycode_to_windows_scancode(event.keycode)
                     {
                         let mut input = INPUT {
                             type_: INPUT_KEYBOARD,
