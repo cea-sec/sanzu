@@ -142,7 +142,7 @@ tcp or vsock"
     pub restrict_clipboard: bool,
     #[clap(
         long,
-        short = 'k',
+        short = 'z',
         help = "Use video source from file instead of video server api"
     )]
     pub extern_img_source: Option<String>,
@@ -290,8 +290,8 @@ Ex: -j c:\user\dupond\printdir\
     pub sync_key_locks: bool,
     #[clap(
         long,
-        short = 'k',
-        help = r"Input video from shared memory
+        short = 'z',
+        help = r"Use video source from file instead of video server api
 Example: if the video server runs in a vm,
 the video buffer is exfiltrated using guest/host shared memory instead of
 tcp or vsock"
@@ -388,7 +388,7 @@ pub struct ProxyArgsConfig {
     pub audio: bool,
     #[clap(
         long,
-        short = 'k',
+        short = 'z',
         help = "Use video source from file instead of video server api"
     )]
     pub extern_img_source: Option<String>,
