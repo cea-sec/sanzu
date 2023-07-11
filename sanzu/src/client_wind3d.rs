@@ -393,10 +393,7 @@ This will ensure no memory leak during runtime
 impl Drop for Direct3D {
     fn drop(&mut self) {
         if let Some(direct3d) = unsafe { self.inner.as_ref() } {
-            let ret = unsafe { direct3d.Release() };
-            if ret != 0 {
-                panic!("Error during direct3d release");
-            }
+            unsafe { direct3d.Release() };
         }
     }
 }
@@ -1403,7 +1400,9 @@ pub fn init_wind3d(
                     };
 
                     if let Err(err) = result {
-                        error!("Error during render: {:?}", err);
+                        if sanzu_direct3d.is_some() {
+                            error!("Error during render: {:?}", err);
+                        }
                         info!("re-Init d3d for resolution {}x{}", width, height);
                         let window = WINHANDLE.load(atomic::Ordering::Acquire);
                         match unsafe { init_d3d9(window, width as u32, height as u32) } {
