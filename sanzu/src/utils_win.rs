@@ -1,182 +1,149 @@
-/* We want hardware keycode! */
-pub fn hid_code_to_hardware_keycode(keycode: u32, flags: u32, vkey: u32) -> Option<u16> {
-    // Distinguish:
-    // - pause
-    // - ver num
-    if let Some(hw_keycode) = match (keycode, vkey) {
-        (0x45, 0xff) => Some(0x007f), // pause
-        (0x45, 0x90) => Some(0x004d), // ver num
-        (_, _) => None,
-    } {
-        return Some(hw_keycode);
+/// Transform PS2 code to hardware keycode
+/// PS2 codes:
+/// https://commons.wikimedia.org/wiki/File:Ps2_de_keyboard_scancode_set_1.svg
+pub fn windows_scancode_to_hardware_keycode(keycode: u32, flags: u32) -> Option<u16> {
+    if flags & 1 == 0 {
+        return match keycode {
+            // numpad
+            0x52 => Some(0x5a), // 0 insert
+            0x4f => Some(0x57), // 1 fin
+            0x50 => Some(0x58), // 2 down
+            0x51 => Some(0x59), // 3 pagedn
+            0x4b => Some(0x53), // 4 left
+            0x4c => Some(0x54), // 5
+            0x4d => Some(0x55), // 6 right
+            0x47 => Some(0x4f), // 7 home
+            0x48 => Some(0x50), // 8 up
+            0x49 => Some(0x51), // 9 pageup
+
+            0x37 => Some(0x3f), // *
+            0x4a => Some(0x52), // -
+            0x4e => Some(0x56), // +
+
+            //0x37 => Some(0x6b), // print screen
+            0x46 => Some(0x4e), // scroll lock
+            0x45 => Some(0x7f), // pause
+
+            0x38 => Some(0x40), // left alt
+
+            0x1D => Some(0x25), // ctrl left
+            0x1 => Some(0x09),  // Esc
+            0x2 => Some(0x0A),  // Digit1
+            0x3 => Some(0x0B),  // Digit2
+            0x4 => Some(0x0C),  // Digit3
+            0x5 => Some(0x0D),  // Digit4
+            0x6 => Some(0x0E),  // Digit5
+            0x7 => Some(0x0F),  // Digit6
+            0x8 => Some(0x10),  // Digit7
+            0x9 => Some(0x11),  // Digit8
+            0xa => Some(0x12),  // Digit9
+            0xb => Some(0x13),  // Digit0
+            0xc => Some(0x14),  // minus
+            0xd => Some(0x15),  // equal
+            0xe => Some(0x16),  // backspace
+
+            0x0f => Some(0x17), // TAB
+            0x10 => Some(0x18), // KeyA
+            0x11 => Some(0x19), // KeyZ
+            0x12 => Some(0x1A), // KeyE
+            0x13 => Some(0x1B), // KeyR
+            0x14 => Some(0x1C), // KeyT
+            0x15 => Some(0x1D), // KeyY
+            0x16 => Some(0x1E), // KeyU
+            0x17 => Some(0x1F), // KeyI
+            0x18 => Some(0x20), // KeyO
+            0x19 => Some(0x21), // KeyP
+            0x1A => Some(0x22), // point point
+            0x1B => Some(0x23), // dollar
+            0x1C => Some(0x24), // enter
+
+            0x1e => Some(0x26), // KeyQ
+            0x1f => Some(0x27), // KeyS
+            0x20 => Some(0x28), // KeyD
+            0x21 => Some(0x29), // KeyF
+            0x22 => Some(0x2A), // KeyG
+            0x23 => Some(0x2B), // KeyH
+            0x24 => Some(0x2C), // KeyJ
+            0x25 => Some(0x2D), // KeyK
+            0x26 => Some(0x2E), // KeyL
+            0x27 => Some(0x2F), // KeyM
+            0x28 => Some(0x30), // percent
+            0x29 => Some(0x31), // square
+            0x2b => Some(0x33), // start
+
+            0x2a => Some(0x32), // shift left
+
+            0x2c => Some(0x34), // KeyW
+            0x2d => Some(0x35), // KeyX
+            0x2e => Some(0x36), // KeyC
+            0x2f => Some(0x37), // KeyV
+            0x30 => Some(0x38), // KeyB
+            0x31 => Some(0x39), // KeyN
+            0x32 => Some(0x3A), // ,
+            0x33 => Some(0x3B), // ;
+            0x34 => Some(0x3C), // :
+            0x35 => Some(0x3D), // !
+
+            0x39 => Some(0x41), // space
+            0x3a => Some(0x42), // capslock
+
+            0x3b => Some(0x43), // F1
+            0x3c => Some(0x44), // F2
+            0x3d => Some(0x45), // F3
+            0x3e => Some(0x46), // F4
+            0x3f => Some(0x47), // F5
+            0x40 => Some(0x48), // F6
+            0x41 => Some(0x49), // F7
+            0x42 => Some(0x4A), // F8
+            0x43 => Some(0x4B), // F9
+            0x44 => Some(0x4C), // F10
+
+            0x53 => Some(0x5b), // suppr / dot keypad
+
+            0x56 => Some(0x5E), // <>
+            0x57 => Some(0x5F), // F11
+            0x58 => Some(0x60), // F12
+
+            _ => None,
+        };
+    } else {
+        return match keycode {
+            // cursor
+            0x4b => Some(0x71), // left
+            0x4d => Some(0x72), // right
+            0x48 => Some(0x6f), // up
+            0x50 => Some(0x74), // down
+
+            // numpad
+            0x35 => Some(0x6a), // /
+            0x1c => Some(0x24), // enter
+
+            0x52 => Some(0x76), // insert
+            0x53 => Some(0x77), // suppr
+
+            0x47 => Some(0x6e), // home
+            0x4F => Some(0x73), // end
+
+            0x49 => Some(0x70), // pageup
+            0x51 => Some(0x75), // pagedn
+
+            0x38 => Some(0x6C), // right alt
+            0x1D => Some(0x69), // ctrl right
+            0x36 => Some(0x3E), // shift right
+
+            0x45 => Some(0x4d), // vernum
+
+            0x5b => Some(0x85), // win gauche
+            0x5c => Some(0x86), // win droit
+            0x5d => Some(0x87), // menu
+
+            _ => None,
+        };
     }
-
-    // Distinguish:
-    // alt left / right
-    // shift / arrow
-    let hw_keycode = match (keycode, flags) {
-        (0x38, 0) | (0x38, 1) => Some(0x40), // left alt
-        (0x38, 2) | (0x38, 3) => Some(0x6C), // right alt
-
-        (0x2a, 0) | (0x2a, 1) => Some(0x32), // real left shift
-
-        (0x47, 2) | (0x47, 3) => Some(0x006e), // home
-
-        (0x35, 2) | (0x35, 3) => Some(0x006a), // keypad /
-
-        (0x37, 2) | (0x37, 3) => Some(0x006b), // print screen
-
-        (0x48, 0) | (0x48, 1) => Some(0x0050), // keypad 8
-        (0x48, 2) | (0x48, 3) => Some(0x006f), // arrow up
-
-        (0x49, 0) | (0x49, 1) => Some(0x0051), // pageup / 9
-        (0x49, 2) | (0x49, 3) => Some(0x0070), // pageup / 9
-
-        // (0x4A, 0) | (0x4A, 1) => Some(0x0052), // minus keypad
-        (0x4b, 0) | (0x4b, 1) => Some(0x0053), // left / 4
-        (0x4b, 2) | (0x4b, 3) => Some(0x0071), // left / 4
-
-        // (0x4c, 0) | (0x4c, 1) => Some(0x0054), // numpad middle 5
-        (0x4d, 0) | (0x4d, 1) => Some(0x0055), // right / right
-        (0x4d, 2) | (0x4d, 3) => Some(0x0072), // right / right
-
-        // (0x4e, 0) | (0x4e, 1) => Some(0x0056), // keypad +
-        (0x4F, 0) | (0x4F, 1) => Some(0x0057), // fin / 1 keypad
-        (0x4F, 2) | (0x4F, 3) => Some(0x0073), // fin / 1 keypad
-
-        (0x50, 0) | (0x50, 1) => Some(0x0058), // down / 2 keypad
-        (0x50, 2) | (0x50, 3) => Some(0x0074), // down / 2 keypad
-
-        (0x51, 0) | (0x51, 1) => Some(0x0059), // pagedown / 3 keypad
-        (0x51, 2) | (0x51, 3) => Some(0x0075), // pagedown / 3 keypad
-
-        (0x52, 0) | (0x52, 1) => Some(0x005a), // 0 keypad
-        (0x52, 2) | (0x52, 3) => Some(0x0076), // insert
-
-        (0x53, 0) | (0x53, 1) => Some(0x005b), // dot keypad
-        (0x53, 2) | (0x53, 3) => Some(0x0077), // dot keypad
-
-        (0x2a, 2) | (0x2a, 3) => {
-            // ignore additional key hit during arrow
-            return None;
-        }
-        (0x1d, 4) | (0x1d, 5) => {
-            // ignore additional key hit during pause key
-            return None;
-        }
-        (_, _) => None,
-    };
-
-    if let Some(hw_keycode) = hw_keycode {
-        return Some(hw_keycode);
-    }
-
-    let hw_keycode = match keycode {
-        0x1 => 0x0009, // Esc
-        0x2 => 0x000A, // Digit1
-        0x3 => 0x000B, // Digit2
-        0x4 => 0x000C, // Digit3
-        0x5 => 0x000D, // Digit4
-        0x6 => 0x000E, // Digit5
-        0x7 => 0x000F, // Digit6
-        0x8 => 0x0010, // Digit7
-        0x9 => 0x0011, // Digit8
-        0xa => 0x0012, // Digit9
-        0xb => 0x0013, // Digit0
-        0xc => 0x0014, // minus
-        0xd => 0x0015, // equal
-        0xe => 0x0016, // equal
-
-        0x0f => 0x0017, // TAB
-        0x10 => 0x0018, // KeyA
-        0x11 => 0x0019, // KeyZ
-        0x12 => 0x001A, // KeyE
-        0x13 => 0x001B, // KeyR
-        0x14 => 0x001C, // KeyT
-        0x15 => 0x001D, // KeyY
-        0x16 => 0x001E, // KeyU
-        0x17 => 0x001F, // KeyI
-        0x18 => 0x0020, // KeyO
-        0x19 => 0x0021, // KeyP
-        0x1A => 0x0022, // point point
-        0x1B => 0x0023, // dollar
-        0x1C => 0x0024, // enter
-
-        0x1D => 0x0025, // ctrl left
-
-        0x1e => 0x0026, // KeyQ
-        0x1f => 0x0027, // KeyS
-        0x20 => 0x0028, // KeyD
-        0x21 => 0x0029, // KeyF
-        0x22 => 0x002A, // KeyG
-        0x23 => 0x002B, // KeyH
-        0x24 => 0x002C, // KeyJ
-        0x25 => 0x002D, // KeyK
-        0x26 => 0x002E, // KeyL
-        0x27 => 0x002F, // KeyM
-        0x28 => 0x0030, // percent
-        0x29 => 0x0031, // square
-        0x2b => 0x0033, // start
-
-        0x2a => 0x0032, // shift left
-
-        0x2c => 0x0034, // KeyW
-        0x2d => 0x0035, // KeyX
-        0x2e => 0x0036, // KeyC
-        0x2f => 0x0037, // KeyV
-        0x30 => 0x0038, // KeyB
-        0x31 => 0x0039, // KeyN
-        0x32 => 0x003A, // ,
-        0x33 => 0x003B, // ;
-        0x34 => 0x003C, // :
-        0x35 => 0x003D, // !
-        0x36 => 0x003E, // shift right
-
-        0x37 => 0x003f, // keypad *
-        0x38 => 0x0040, // alt left/right
-
-        0x39 => 0x0041, // space
-        0x3a => 0x0042, // capslock
-
-        0x3b => 0x0043, // F1
-        0x3c => 0x0044, // F2
-        0x3d => 0x0045, // F3
-        0x3e => 0x0046, // F4
-        0x3f => 0x0047, // F5
-        0x40 => 0x0048, // F6
-        0x41 => 0x0049, // F7
-        0x42 => 0x004A, // F8
-        0x43 => 0x004B, // F9
-        0x44 => 0x004C, // F10
-
-        0x46 => 0x004e, // scroll lock
-
-        0x47 => 0x004f, // home / 7
-        0x48 => 0x006f, // up / 8
-        0x49 => 0x0070, // pageup / 9
-        0x4A => 0x0052, // minus keypad
-        0x4b => 0x0071, // left / 4
-        0x4c => 0x0054, // numpad middle 5
-        0x4d => 0x0072, // right / right
-        0x4e => 0x0056, // keypad +
-        0x4F => 0x0073, // fin / 1 keypad
-        0x50 => 0x0074, // down / 2 keypad
-        0x51 => 0x0075, // pagedown / 3 keypad
-        0x52 => 0x0076, // 0 keypad
-        0x53 => 0x0077, // suppr / dot keypad
-
-        0x56 => 0x005E, // <>
-        0x57 => 0x005F, // F11
-        0x58 => 0x0060, // F12
-
-        _ => return None,
-    };
-
-    Some(hw_keycode as u16)
 }
 
-/* We want hardware keycode! */
-pub fn hardware_keycode_to_hid_code(hw_keycode: u32) -> Option<(u16, bool)> {
+/// Convert hardware keycode to ps2 code
+pub fn hardware_keycode_to_windows_scancode(hw_keycode: u32) -> Option<(u16, bool)> {
     let (keycode, extended) = match hw_keycode {
         0x0009 => (0x01, false), // Esc
         0x000A => (0x02, false), // Digit1
