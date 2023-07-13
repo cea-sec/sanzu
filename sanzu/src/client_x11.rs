@@ -864,6 +864,7 @@ impl Client for ClientInfo {
                     trace!("Key down {:?}", event.detail as u32 & 0xFF);
                     self.keys_state[(event.detail as u32 & 0xFF) as usize] = true;
 
+                    let mut skip_key = false;
                     // If Ctrl alt shift s => Generate toggle server logs
                     if event.detail == KEY_S as u8 {
                         // Ctrl Shift Alt
@@ -873,6 +874,7 @@ impl Client for ClientInfo {
                         {
                             self.display_stats = !self.display_stats;
                             info!("Toggle server logs");
+                            skip_key = true;
                         }
                     }
 
@@ -884,6 +886,7 @@ impl Client for ClientInfo {
                             && self.keys_state[KEY_ALT]
                         {
                             self.clipbard_trig = true;
+                            skip_key = true;
                         }
                     }
 
@@ -904,17 +907,20 @@ impl Client for ClientInfo {
 
                             self.grab_keyboard = !self.grab_keyboard;
                             info!("Toggle ungrab Keyboard {}", self.grab_keyboard);
+                            skip_key = true;
                         }
                     }
 
-                    let eventkey = tunnel::EventKey {
-                        keycode: event.detail as u32,
-                        updown: true,
-                    };
-                    let msg_event = tunnel::MessageClient {
-                        msg: Some(tunnel::message_client::Msg::Key(eventkey)),
-                    };
-                    events.push(msg_event);
+                    if !skip_key {
+                        let eventkey = tunnel::EventKey {
+                            keycode: event.detail as u32,
+                            updown: true,
+                        };
+                        let msg_event = tunnel::MessageClient {
+                            msg: Some(tunnel::message_client::Msg::Key(eventkey)),
+                        };
+                        events.push(msg_event);
+                    }
                 }
                 Event::KeyRelease(event) => {
                     trace!("key up");

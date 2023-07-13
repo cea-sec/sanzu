@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Fixed
 - On windows, keyboard hooks now hooks alt-tab / window.
+- Skip keys on sanzu keyboard shortcuts
 ### Changed
 - extern-img-source short version is '-z' for all binaries
 

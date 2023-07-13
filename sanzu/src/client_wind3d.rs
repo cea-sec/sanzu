@@ -992,7 +992,7 @@ extern "system" fn hook_callback_keyboard(code: i32, w_param: u64, l_param: i64)
                     keycode: keycode as u32,
                     updown,
                 };
-
+                let mut skip_key = false;
                 // If Ctrl alt shift s => Generate toggle server logs
                 if keycode == KEY_S as u16 && updown {
                     // Ctrl Shift Alt
@@ -1001,6 +1001,7 @@ extern "system" fn hook_callback_keyboard(code: i32, w_param: u64, l_param: i64)
                         let display_stats = DISPLAY_STATS.load(atomic::Ordering::Acquire);
                         DISPLAY_STATS.store(!display_stats, atomic::Ordering::Release);
                         info!("Toggle server logs");
+                        skip_key = true;
                     }
                 }
 
@@ -1010,6 +1011,7 @@ extern "system" fn hook_callback_keyboard(code: i32, w_param: u64, l_param: i64)
                     let keys_state = KEYS_STATE.lock().unwrap();
                     if keys_state[KEY_CTRL] && keys_state[KEY_SHIFT] && keys_state[KEY_ALT] {
                         CLIPBOARD_TRIG.store(true, atomic::Ordering::Release);
+                        skip_key = true;
                     }
                 }
 
@@ -1030,20 +1032,23 @@ extern "system" fn hook_callback_keyboard(code: i32, w_param: u64, l_param: i64)
                         }
 
                         info!("Toggle ungrab Keyboard {}", *grab_keyboard);
+                        skip_key = true;
                     }
                 }
 
                 if *GRAB_KEYBOARD.lock().unwrap() {
-                    let msg_event = tunnel::MessageClient {
-                        msg: Some(tunnel::message_client::Msg::Key(eventkey)),
-                    };
-                    EVENT_SENDER
-                        .lock()
-                        .unwrap()
-                        .as_ref()
-                        .unwrap()
-                        .send(msg_event)
-                        .expect("Error in send key_state");
+                    if !skip_key {
+                        let msg_event = tunnel::MessageClient {
+                            msg: Some(tunnel::message_client::Msg::Key(eventkey)),
+                        };
+                        EVENT_SENDER
+                            .lock()
+                            .unwrap()
+                            .as_ref()
+                            .unwrap()
+                            .send(msg_event)
+                            .expect("Error in send key_state");
+                    }
                 }
             }
             if *GRAB_KEYBOARD.lock().unwrap() {
