@@ -260,6 +260,7 @@ pub struct ClientArgsConfig {
  - allow: send clipboard to server on local clipboard modification
  - deny: never send local clipboard to server
  - trig: send local clipboard to server on hitting special shortcut
+         Shortcut to trig the clipboard: Ctrl-Alt-Shift-C
 "#
     )]
     pub clipboard: String,
@@ -310,7 +311,8 @@ tcp or vsock"
         short = 'u',
         help = r"Grab and keep keyboard on focus.
 This allows (linux) sending special keys like alt-tab
-without being interpreted by the local window manager"
+without being interpreted by the local window manager.
+Shortcut to toggle grabbing: Ctrl-Alt-Shift-H"
     )]
     pub grab_keyboard: bool,
     #[clap(long, help = "Add connection timeout (seconds)")]
