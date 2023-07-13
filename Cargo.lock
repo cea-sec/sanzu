@@ -205,7 +205,7 @@ dependencies = [
  "polling",
  "rustix",
  "slab",
- "socket2",
+ "socket2 0.4.9",
  "waker-fn",
 ]
 
@@ -2463,6 +2463,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_yaml",
+ "socket2 0.5.3",
  "spin_sleep",
  "toml 0.7.3",
  "twelf",
@@ -2515,6 +2516,7 @@ dependencies = [
  "sanzu-common",
  "serde",
  "serde_derive",
+ "socket2 0.5.3",
  "toml 0.7.3",
  "uuid",
  "x509-parser",
@@ -2646,6 +2648,16 @@ checksum = "64a4a911eed85daf18834cfaa86a79b7d266ff93ff5ba14005426219480ed662"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "socket2"
+version = "0.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2538b18701741680e0322a2302176d3253a35388e2e62f172f64f4f16605f877"
+dependencies = [
+ "libc",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

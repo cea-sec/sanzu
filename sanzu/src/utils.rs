@@ -555,3 +555,30 @@ set_connection_timeout!(std::os::unix::net::UnixStream);
 use vsock;
 #[cfg(unix)]
 set_connection_timeout!(vsock::VsockStream);
+
+/// Add tcp timeout
+/// This can avoid application stalling on network outage
+pub fn set_tcp_timeout(socket_ref: socket2::SockRef, timeout: Option<Duration>) -> Result<()> {
+    if let Some(connection_timeout) = &timeout {
+        info!("Set keep alive");
+        let keepalive = socket2::TcpKeepalive::new()
+            .with_time(*connection_timeout)
+            .with_interval(*connection_timeout);
+
+        socket_ref
+            .set_tcp_keepalive(&keepalive)
+            .context("Cannot set keepalive timeout")?;
+        socket_ref
+            .set_linger(Some(*connection_timeout))
+            .context("Cannot set linger timeout")?;
+
+        socket_ref
+            .set_keepalive(true)
+            .context("Cannot set keepalive")?;
+        #[cfg(target_os = "linux")]
+        socket_ref
+            .set_tcp_user_timeout(Some(*connection_timeout))
+            .context("Cannot set tcp user timeout")?;
+    }
+    Ok(())
+}
