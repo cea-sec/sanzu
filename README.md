@@ -33,8 +33,3 @@ Sanzu client running in seamless mode under windows (both windows are from the r
 Sanzu client running in seamless mode under linux (both windows are from the remote server)
 ![Alt text](misc/screenshot/sanzu_linux.png?raw=true "Sanzu client running in seamless mode under linux")
 
-
-## Usefull shortcuts
-- Ctrl Alt Shift H: leave keyboard grab mode
-- Ctrl Alt Shift C: on clipboard "trigger" mode, the client sends its clipboard value
-- Ctrl Alt Shift S: toggle debug statistics on screen

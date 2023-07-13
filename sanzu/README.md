@@ -149,6 +149,11 @@ And the client:
    sanzu_client 127.0.0.1 1144 --audio --tls-ca ./certs/rootCA.crt --tls-server-name localhost
 ```
 
+## Usefull shortcuts
+- Ctrl Alt Shift H: leave keyboard grab mode
+- Ctrl Alt Shift C: on clipboard "trigger" mode, the client sends its clipboard value
+- Ctrl Alt Shift S: toggle debug statistics on screen
+
 
 ## Server configuration file
 ### video
