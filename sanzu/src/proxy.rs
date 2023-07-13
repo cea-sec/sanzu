@@ -4,8 +4,8 @@ use crate::{
     config::ConfigServer,
     sound::{encode_sound, SOUND_FREQ},
     utils::{
-        get_xwd_data, HasTimeout, ProxyArgsConfig, MAX_BYTES_PER_LINE, MAX_WINDOW_HEIGHT,
-        MAX_WINDOW_WIDTH,
+        get_xwd_data, set_tcp_timeout, HasTimeout, ProxyArgsConfig, MAX_BYTES_PER_LINE,
+        MAX_WINDOW_HEIGHT, MAX_WINDOW_WIDTH,
     },
     video_encoder::{get_encoder_category, init_video_encoder},
 };
@@ -191,12 +191,13 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
                             "Error in Tcp bind {:?} {:?}",
                             arguments.listen_address, listen_port
                         ))?;
+
+                let socket_ref = socket2::SockRef::from(&listener);
+                set_tcp_timeout(socket_ref, connection_timeout).context("Cannot set keepalive")?;
+
                 let (client, addr) = listener.accept().context("failed to accept connection")?;
                 info!("Client {:?}", addr);
                 client.set_nodelay(true).context("Error in set_nodelay")?;
-                client
-                    .set_connection_timeout(connection_timeout)
-                    .context("Cannot set timeout")?;
                 Box::new(client)
             }
             (None, Some(unix_socket)) => {
@@ -238,9 +239,10 @@ pub fn run_server(config: &ConfigServer, arguments: &ProxyArgsConfig) -> Result<
         let destination = format!("{}:{}", arguments.server_addr, port);
         let server = TcpStream::connect(&destination)
             .context(format!("Error in tcp server connection {destination:?}"))?;
-        server
-            .set_connection_timeout(connection_timeout)
-            .context("Cannot set timeout")?;
+
+        let socket_ref = socket2::SockRef::from(&server);
+        set_tcp_timeout(socket_ref, connection_timeout).context("Cannot set keepalive")?;
+
         info!("Connected to server");
         server.set_nodelay(true).expect("set_nodelay call failed");
         Box::new(server)

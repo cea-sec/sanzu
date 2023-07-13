@@ -34,9 +34,13 @@ use crate::config::AuthType;
 use crate::{
     config::{ConfigServer, ConfigTls},
     sound::SoundEncoder,
-    utils::{HasTimeout, ServerArgsConfig, ServerEvent},
+    utils::{set_tcp_timeout, ServerArgsConfig, ServerEvent},
     video_encoder::{get_encoder_category, init_video_encoder, Encoder},
 };
+
+#[cfg(target_family = "unix")]
+use crate::utils::HasTimeout;
+
 use rustls::ServerConnection;
 
 use x509_parser::prelude::*;
@@ -194,14 +198,18 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
                 .address
                 .parse::<IpAddr>()
                 .context(format!("Error ip in parsing {:?}", arguments.address))?;
-            let listener = TcpListener::bind(net::SocketAddr::new(address, port))?;
+
+            let listener =
+                TcpListener::bind(net::SocketAddr::new(address, port)).context("Error in bind")?;
+
+            let socket_ref = socket2::SockRef::from(&listener);
+            set_tcp_timeout(socket_ref, connection_timeout).context("Cannot set keepalive")?;
+
             let (socket, addr) = listener
                 .accept()
                 .context(format!("Error in TcpListener {address} {port}"))?;
+
             socket.set_nodelay(true)?;
-            socket
-                .set_connection_timeout(connection_timeout)
-                .context("Cannot set timeout")?;
             info!("Client {:?}", addr);
             Box::new(socket)
         }

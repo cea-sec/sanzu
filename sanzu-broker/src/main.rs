@@ -40,6 +40,7 @@ use std::{
     io::{Read, Write},
     net::{IpAddr, SocketAddr},
     process,
+    time::Duration,
 };
 
 use uuid::Uuid;
@@ -52,6 +53,33 @@ const TOKEN_UNIX_SOCKET_PATH: &str = "%UNIX_SOCK_PATH%";
 
 const SERVER: Token = Token(0);
 const CLIENT: Token = Token(1);
+
+/// Add tcp timeout
+/// This can avoid application stalling on network outage
+pub fn set_tcp_timeout(socket_ref: socket2::SockRef, timeout: Option<Duration>) -> Result<()> {
+    if let Some(connection_timeout) = &timeout {
+        info!("Set keep alive");
+        let keepalive = socket2::TcpKeepalive::new()
+            .with_time(*connection_timeout)
+            .with_interval(*connection_timeout);
+
+        socket_ref
+            .set_tcp_keepalive(&keepalive)
+            .context("Cannot set keepalive timeout")?;
+        socket_ref
+            .set_linger(Some(*connection_timeout))
+            .context("Cannot set linger timeout")?;
+
+        socket_ref
+            .set_keepalive(true)
+            .context("Cannot set keepalive")?;
+        #[cfg(target_os = "linux")]
+        socket_ref
+            .set_tcp_user_timeout(Some(*connection_timeout))
+            .context("Cannot set tcp user timeout")?;
+    }
+    Ok(())
+}
 
 /// Replace pattern tokens in list
 pub fn replace_source(args: &[String], needle: &str, new_str: &str) -> Vec<String> {
@@ -328,10 +356,22 @@ fn auth_and_connect(config: &Config, mut sock: std::net::TcpStream, addr: Socket
 }
 
 /// Accept and dispatch clients connections
-fn serve_user(config: &Config, address: IpAddr, port: u16) -> Result<()> {
+fn serve_user(
+    config: &Config,
+    address: IpAddr,
+    port: u16,
+    connection_timeout: Option<u32>,
+) -> Result<()> {
     info!("Server loop");
     let listener = std::net::TcpListener::bind(SocketAddr::new(address, port))
         .context(format!("Error in TcpListener bind {address} {port}"))?;
+
+    let connection_timeout =
+        connection_timeout.map(|timeout| std::time::Duration::from_secs(timeout as u64));
+
+    let socket_ref = socket2::SockRef::from(&listener);
+    set_tcp_timeout(socket_ref, connection_timeout).context("Cannot set keepalive")?;
+
     loop {
         let (sock, addr) = listener.accept().context("Failed to accept connection")?;
 
@@ -394,6 +434,13 @@ Protocol version: {VERSION:?}
                 .value_parser(clap::value_parser!(u16))
                 .help("Bind port number"),
         )
+        .arg(
+            Arg::new("connection_timeout")
+                .long("connection-timeout")
+                .help("TCP timeout")
+                .num_args(1)
+                .value_parser(clap::value_parser!(u32)),
+        )
         .get_matches();
 
     let address = *matches
@@ -404,6 +451,8 @@ Protocol version: {VERSION:?}
         .get_one::<u16>("port")
         .context("Cannot parse port")?;
 
+    let connection_timeout = matches.get_one::<u32>("connection-timeout").copied();
+
     let config = read_config(
         matches
             .get_one::<String>("config")
@@ -411,7 +460,7 @@ Protocol version: {VERSION:?}
     )
     .context("Error in read_config")?;
 
-    if let Err(err) = serve_user(&config, address, port) {
+    if let Err(err) = serve_user(&config, address, port, connection_timeout) {
         error!("Server error");
         err.chain().for_each(|cause| error!(" - due to {}", cause));
     }
