@@ -272,7 +272,7 @@ fn set_mouse_position(server_info: &mut ServerInfo, event_x: u32, event_y: u32) 
         ..Default::default()
     };
     {
-        let mut mouse = unsafe { input.u.mi_mut() };
+        let mouse = unsafe { input.u.mi_mut() };
         let fx = event_x as f32 * (65535.0 / server_info.width as f32);
         let fy = event_y as f32 * (65535.0 / server_info.height as f32);
         mouse.dx = fx as i32;
@@ -892,7 +892,7 @@ impl Server for ServerInfo {
                     };
                     input.type_ = INPUT_MOUSE;
                     {
-                        let mut mouse = unsafe { input.u.mi_mut() };
+                        let mouse = unsafe { input.u.mi_mut() };
                         mouse.mouseData = event.button;
                         mouse.dwFlags = 0;
                         match (event.button, event.updown) {
@@ -963,7 +963,7 @@ impl Server for ServerInfo {
                         };
 
                         {
-                            let mut keyb = unsafe { input.u.ki_mut() };
+                            let keyb = unsafe { input.u.ki_mut() };
                             keyb.wScan = keycode;
                             if !event.updown {
                                 keyb.dwFlags |= KEYEVENTF_KEYUP;
