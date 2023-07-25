@@ -375,6 +375,8 @@ pub struct ServerX11 {
     #[cfg(feature = "printfile")]
     /// dbus printfile receiver
     pub dbus_printfile_receiver: Receiver<PrintFile>,
+    /// simulated dpi
+    pub dpi: u32,
 }
 
 fn get_property32<C: Connection>(
@@ -976,6 +978,7 @@ pub fn init_x11rb(
         avoid_img_extraction: arguments.avoid_img_extraction,
         #[cfg(feature = "printfile")]
         dbus_printfile_receiver,
+        dpi: arguments.dpi,
     };
 
     Ok(Box::new(server))
@@ -1595,6 +1598,7 @@ impl Server for ServerX11 {
             height as u16,
             new_video_name,
             new_video_index,
+            self.dpi,
         )
         .context("Error in add_video_mode")?;
 
