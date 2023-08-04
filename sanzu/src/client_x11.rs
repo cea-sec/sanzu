@@ -25,7 +25,6 @@ use x11rb::{
         randr::{self, ConnectionExt as _},
         render,
         shape::{self, ConnectionExt as _},
-        shm::{self, ConnectionExt as _},
         xfixes::ConnectionExt as _,
         xproto::ConnectionExt as _,
         xproto::*,
@@ -43,20 +42,6 @@ const KEY_ALT: usize = 64;
 const KEY_S: usize = 39;
 const KEY_C: usize = 54;
 const KEY_H: usize = 43;
-
-/// Get the supported SHM version from the X11 server
-fn check_shm_version<C: Connection>(conn: &C) -> Result<(u16, u16)> {
-    conn.extension_information(shm::X11_EXTENSION_NAME)
-        .context("Error in get shm extension")?
-        .context("Shm must be supported")?;
-
-    let shm_version = conn
-        .shm_query_version()
-        .context("Error in query shm version")?
-        .reply()
-        .context("Error in query shm version reply")?;
-    Ok((shm_version.major_version, shm_version.minor_version))
-}
 
 /// Holds information on the local client graphic window
 pub struct WindowInfo {
@@ -282,16 +267,6 @@ pub fn init_x11rb(
     // Force the resolution to be less thant the server side
     let width = width.min(screen_width);
     let height = height.min(screen_height);
-
-    // Check for SHM 1.2 support (needed for fd passing)
-    let (major, minor) = check_shm_version(&conn).context("Error in check_shm_version")?;
-    if major < 1 || (major == 1 && minor < 2) {
-        let err = format!(
-            "X11 server supports version {major}.{minor} of the SHM extension, but version 1.2 \
-             is needed",
-        );
-        return Err(anyhow!(err));
-    }
 
     /* Enable big request for 4k and more */
     let max_request_size = conn.maximum_request_bytes();
