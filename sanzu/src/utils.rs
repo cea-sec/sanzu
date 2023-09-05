@@ -427,8 +427,8 @@ pub struct ProxyArgsConfig {
 
 const MAX_HEADER_SIZE: u32 = 0x100;
 const MAX_NCOLORS: u32 = 0x100;
-pub const MAX_WINDOW_WIDTH: u32 = 8129;
-pub const MAX_WINDOW_HEIGHT: u32 = 8129;
+pub const MAX_WINDOW_WIDTH: u32 = 8192;
+pub const MAX_WINDOW_HEIGHT: u32 = 8192;
 pub const MAX_BYTES_PER_LINE: u32 = MAX_WINDOW_WIDTH * 4;
 
 pub const MAX_CURSOR_WIDTH: u32 = 1024;
