@@ -2092,22 +2092,12 @@ dependencies = [
 
 [[package]]
 name = "prost"
-version = "0.11.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e48e50df39172a3e7eb17e14642445da64996989bc212b583015435d39a58537"
-dependencies = [
- "bytes",
- "prost-derive 0.11.8",
-]
-
-[[package]]
-name = "prost"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa8473a65b88506c106c28ae905ca4a2b83a2993640467a41bb3080627ddfd2c"
 dependencies = [
  "bytes",
- "prost-derive 0.12.0",
+ "prost-derive",
 ]
 
 [[package]]
@@ -2124,25 +2114,12 @@ dependencies = [
  "once_cell",
  "petgraph",
  "prettyplease",
- "prost 0.12.0",
+ "prost",
  "prost-types",
  "regex",
  "syn 2.0.13",
  "tempfile",
  "which",
-]
-
-[[package]]
-name = "prost-derive"
-version = "0.11.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ea9b0f8cbe5e15a8a042d030bd96668db28ecb567ec37d691971ff5731d2b1b"
-dependencies = [
- "anyhow",
- "itertools",
- "proc-macro2",
- "quote",
- "syn 1.0.109",
 ]
 
 [[package]]
@@ -2164,7 +2141,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cebe0a918c97f86c217b0f76fd754e966f8b9f41595095cf7d74cb4e59d730f6"
 dependencies = [
- "prost 0.12.0",
+ "prost",
 ]
 
 [[package]]
@@ -2489,7 +2466,7 @@ dependencies = [
  "libgssapi",
  "log",
  "pam",
- "prost 0.11.8",
+ "prost",
  "prost-build",
  "rustls",
  "rustls-pemfile",
