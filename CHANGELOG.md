@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - On windows, keyboard hooks now hooks alt-tab / window.
 - Skip keys on sanzu keyboard shortcuts
 - TCP timeout with keepalive/tcp_user_timeout for client/server/proxy
+- x11 client doesn't need shm
 ### Changed
 - extern-img-source short version is '-z' for all binaries
 

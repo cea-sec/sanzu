@@ -157,7 +157,7 @@ impl AVFrame {
 
     pub fn plane(&mut self, indx: usize, len: usize) -> &mut [u8] {
         unsafe {
-            let data_ptr = (*self.ptr).data[indx] as *mut u8;
+            let data_ptr = (*self.ptr).data[indx];
             std::slice::from_raw_parts_mut(data_ptr, len)
         }
     }

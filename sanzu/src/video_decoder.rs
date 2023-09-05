@@ -131,19 +131,16 @@ fn decode(
                 let p2size = unsafe { (*frame_ptr).linesize[1] * (*frame_ptr).height / 2 };
 
                 /* Y part */
-                let slice_y = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[0] as *mut u8, p1size as _)
-                };
+                let slice_y =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[0], p1size as _) };
 
                 /* U part */
-                let slice_u = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[1] as *mut u8, p2size as _)
-                };
+                let slice_u =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[1], p2size as _) };
 
                 /* V part */
-                let slice_v = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[2] as *mut u8, p2size as _)
-                };
+                let slice_v =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[2], p2size as _) };
 
                 let y_lane = unsafe { (*frame_ptr).linesize[0] as u32 };
                 let u_lane = unsafe { (*frame_ptr).linesize[1] as u32 };
@@ -204,19 +201,16 @@ fn decode(
                 let p2size = unsafe { (*frame_ptr).linesize[1] * (*frame_ptr).height };
 
                 /* Y part */
-                let slice_y = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[0] as *mut u8, p1size as _)
-                };
+                let slice_y =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[0], p1size as _) };
 
                 /* U part */
-                let slice_u = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[1] as *mut u8, p2size as _)
-                };
+                let slice_u =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[1], p2size as _) };
 
                 /* V part */
-                let slice_v = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[2] as *mut u8, p2size as _)
-                };
+                let slice_v =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[2], p2size as _) };
 
                 let y_lane = unsafe { (*frame_ptr).linesize[0] as u32 };
                 let u_lane = unsafe { (*frame_ptr).linesize[1] as u32 };
@@ -277,14 +271,12 @@ fn decode(
                 let p2size = unsafe { (*frame_ptr).linesize[1] * (*frame_ptr).height };
 
                 /* Y part */
-                let slice_y = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[0] as *mut u8, p1size as _)
-                };
+                let slice_y =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[0], p1size as _) };
 
                 /* UV part */
-                let slice_uv = unsafe {
-                    std::slice::from_raw_parts_mut((*frame_ptr).data[1] as *mut u8, p2size as _)
-                };
+                let slice_uv =
+                    unsafe { std::slice::from_raw_parts_mut((*frame_ptr).data[1], p2size as _) };
 
                 let y_lane = unsafe { (*frame_ptr).linesize[0] as u32 };
                 let uv_lane = unsafe { (*frame_ptr).linesize[1] as u32 };
