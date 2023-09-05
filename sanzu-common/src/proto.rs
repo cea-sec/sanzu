@@ -22,8 +22,8 @@ pub mod tunnel {
 const MAX_PACKET_LEN: usize = 100 * 1024 * 1024; // 100 Mo
 
 /// Read + Write trait used to send protobuf serialized messages
-pub trait ReadWrite: Read + Write {}
-impl<T: Read + Write> ReadWrite for T {}
+pub trait ReadWrite: Read + Write + Send + Sync {}
+impl<T: Read + Write + Send + Sync> ReadWrite for T {}
 
 pub struct Stdio {}
 

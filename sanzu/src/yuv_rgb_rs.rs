@@ -3010,9 +3010,9 @@ pub fn rgba_to_yuv420_std_rayon(
     v_stride: usize,
     yuv_type: YuvType,
 ) {
-    let buffer_y_raw = buffer_y.as_mut_ptr() as *mut u8;
-    let buffer_u_raw = buffer_u.as_mut_ptr() as *mut u8;
-    let buffer_v_raw = buffer_v.as_mut_ptr() as *mut u8;
+    let buffer_y_raw = buffer_y.as_mut_ptr();
+    let buffer_u_raw = buffer_u.as_mut_ptr();
+    let buffer_v_raw = buffer_v.as_mut_ptr();
 
     let slice_y_len = y_stride;
     let slice_u_len = u_stride;
@@ -3119,9 +3119,9 @@ pub fn rgba_to_yuv444_std_rayon(
     v_stride: usize,
     yuv_type: YuvType,
 ) {
-    let buffer_y_raw = buffer_y.as_mut_ptr() as *mut u8;
-    let buffer_u_raw = buffer_u.as_mut_ptr() as *mut u8;
-    let buffer_v_raw = buffer_v.as_mut_ptr() as *mut u8;
+    let buffer_y_raw = buffer_y.as_mut_ptr();
+    let buffer_u_raw = buffer_u.as_mut_ptr();
+    let buffer_v_raw = buffer_v.as_mut_ptr();
 
     let slice_y_len = y_stride;
     let slice_u_len = u_stride;
