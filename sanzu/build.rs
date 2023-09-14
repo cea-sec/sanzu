@@ -5,6 +5,11 @@ fn main() {
     if std::env::var("CARGO_CFG_TARGET_OS").unwrap() != "windows" {
         return;
     }
+
+    if let Ok(ffmpeg_lib_dir) = std::env::var("FFMPEG_LIB_PATH") {
+        println!("cargo:rustc-link-search={}", ffmpeg_lib_dir);
+    }
+
     // only build the resource for release builds
     // as calling rc.exe might be slow
     if std::env::var("PROFILE").unwrap() == "release" {

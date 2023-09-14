@@ -45,8 +45,11 @@ RUN set -eux; \
       libxtst \
       libxext \
       ffmpeg \
+      x264 \
+      x265 \
       libxdamage \
       libxfixes \
+      rsync \
       curl ; \
     cd /tmp ; \
     curl -L -o /tmp/ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n6.0-latest-win64-gpl-shared-6.0.zip ; \
@@ -56,6 +59,15 @@ RUN set -eux; \
         ln -s /usr/x86_64-w64-mingw32/lib/${lib} /usr/x86_64-w64-mingw32/lib/${lib/-*.dll/.dll} ; \
     done;
 
+# XXX link "ffmpeg directory" to "include directory" to support codes including "include/libavcodec"
+RUN set -eux; \
+    curl -L -o /tmp/ffmpeg-src.tar.gz https://ffmpeg.org/releases/ffmpeg-6.0.tar.gz ; \
+    cd /tmp ; \
+    tar xzf /tmp/ffmpeg-src.tar.gz; \
+    cd ffmpeg-6.0 ; \
+    ./configure --enable-gpl --enable-libx264 --enable-libx265 --enable-shared ; \
+    chmod -R uog+rx  /tmp/ffmpeg-6.0/ ; \
+    ln -s `pwd` include ;
 
 RUN set -eux; \
     sudo  bash -c "echo 'Defaults env_keep += \"ftp_proxy http_proxy https_proxy no_proxy\"' >> /etc/sudoers" ; \
@@ -71,4 +83,4 @@ RUN set -eux; \
 
 
 WORKDIR /SRC
-CMD cargo build --target x86_64-pc-windows-gnu $CARGO_OPT
+CMD FFMPEG_LIB_PATH=/usr/x86_64-w64-mingw32/lib FFMPEG_DIR=/tmp/ffmpeg-6.0/ cargo build --target x86_64-pc-windows-gnu $CARGO_OPT
