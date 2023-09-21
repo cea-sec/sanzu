@@ -30,4 +30,4 @@ winapi = "0.3"
 
 [target.'cfg(unix)'.dependencies]
 libgssapi = { version = "0.6", optional = true }
-pam = {git = "https://github.com/serpilliere/pam.git", branch="fix_env_parsing"}
+pam = {git = "https://github.com/serpilliere/pam.git", branch="multiple_fix"}
