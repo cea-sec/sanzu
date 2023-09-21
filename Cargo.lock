@@ -1890,7 +1890,7 @@ dependencies = [
 [[package]]
 name = "pam"
 version = "0.7.0"
-source = "git+https://github.com/serpilliere/pam.git?branch=fix_env_parsing#a65741d5a566c527cc5ce2624b0b15bed53918a1"
+source = "git+https://github.com/serpilliere/pam.git?branch=multiple_fix#97479656a04384184aaeb39b20c22505046666c3"
 dependencies = [
  "libc",
  "memchr",
