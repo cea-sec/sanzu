@@ -1890,7 +1890,7 @@ dependencies = [
 [[package]]
 name = "pam"
 version = "0.7.0"
-source = "git+https://github.com/serpilliere/pam.git?branch=multiple_fix#97479656a04384184aaeb39b20c22505046666c3"
+source = "git+https://github.com/serpilliere/pam.git?branch=multiple_fix#02416f2a5a194b1e7c24df94be636a155f87602f"
 dependencies = [
  "libc",
  "memchr",
@@ -1913,8 +1913,7 @@ dependencies = [
 [[package]]
 name = "pam-sys"
 version = "1.0.0-alpha4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5e9dfd42858f6a6bb1081079fd9dc259ca3e2aaece6cb689fd36b1058046c969"
+source = "git+https://github.com/serpilliere/pam-sys.git?branch=gnuc_va_list-fix#df8080b8b813f33963e8a169f157bff1607d54f4"
 dependencies = [
  "bindgen 0.59.2",
  "libc",
