@@ -154,7 +154,7 @@ pub fn make_client_config(
         let mut reader = BufReader::new(certfile);
         root_store.add_parsable_certificates(&rustls_pemfile::certs(&mut reader).unwrap());
     } else {
-        root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+        root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
             OwnedTrustAnchor::from_subject_spki_name_constraints(
                 ta.subject,
                 ta.spki,
@@ -179,7 +179,7 @@ pub fn make_client_config(
             let certs = load_certs(client_cert).context("Cannot load ca certificates")?;
             let key = load_private_key(client_key).context("Cannot load private key")?;
             config
-                .with_single_cert(certs, key)
+                .with_client_auth_cert(certs, key)
                 .context("Invalid client auth certs/key")?
         }
         (None, None) => config.with_no_client_auth(),
