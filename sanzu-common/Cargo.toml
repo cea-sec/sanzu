@@ -11,7 +11,7 @@ prost-build = "0.12"
 
 [dependencies]
 anyhow = "1.0"
-byteorder = "1.4"
+byteorder = "1.5"
 env_logger = "0.10"
 log = "0.4"
 prost = "0.12"
