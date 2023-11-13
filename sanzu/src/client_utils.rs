@@ -58,28 +58,7 @@ impl PartialEq for Area {
 
 impl PartialOrd for Area {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let ret = self.id.partial_cmp(&other.id);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-
-        let ret = self.size.partial_cmp(&other.size);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.position.partial_cmp(&other.position);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.mapped.partial_cmp(&other.mapped);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        let ret = self.is_app.partial_cmp(&other.is_app);
-        if ret != Some(Ordering::Equal) {
-            return ret;
-        }
-        self.name.partial_cmp(&other.name)
+        Some(self.cmp(other))
     }
 }
 
