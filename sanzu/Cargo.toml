@@ -68,7 +68,7 @@ winapi = { version = "0.3", features = [
 
 [target.'cfg(unix)'.dependencies]
 libgssapi = { version = "0.6", optional = true }
-nix = "0.26"
+nix = {version = "0.26", features = ["process"]}
 vsock = "0.3"
 x11-clipboard = "0.8"
 
