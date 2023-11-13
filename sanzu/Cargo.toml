@@ -29,7 +29,7 @@ lock_keys = {git="https://github.com/risoflora/lock_keys", rev="38d97697c054d56e
 log = "0.4"
 memmap2 = "0.9"
 opus= "0.3"
-rpassword = "7.2"
+rpassword = "7.3"
 rustls = "0.21"
 rustls-pemfile = "1.0"
 sanzu-common = { path="../sanzu-common", default-features = false}
