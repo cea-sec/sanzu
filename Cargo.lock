@@ -415,6 +415,26 @@ dependencies = [
  "clang-sys",
  "lazy_static",
  "lazycell",
+ "peeking_take_while",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "rustc-hash",
+ "shlex",
+ "syn 2.0.39",
+]
+
+[[package]]
+name = "bindgen"
+version = "0.69.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ffcebc3849946a7170a05992aac39da343a90676ab392c51a4280981d6379c2"
+dependencies = [
+ "bitflags 2.4.1",
+ "cexpr",
+ "clang-sys",
+ "lazy_static",
+ "lazycell",
  "log",
  "peeking_take_while",
  "prettyplease",
@@ -2485,7 +2505,7 @@ name = "sanzu"
 version = "0.1.4"
 dependencies = [
  "anyhow",
- "bindgen 0.68.1",
+ "bindgen 0.69.1",
  "byteorder",
  "cc",
  "clap 4.4.8",
@@ -2536,7 +2556,7 @@ name = "sanzu-common"
 version = "0.1.4"
 dependencies = [
  "anyhow",
- "bindgen 0.68.1",
+ "bindgen 0.69.1",
  "byteorder",
  "env_logger 0.10.1",
  "libgssapi",
@@ -2556,7 +2576,7 @@ name = "sanzu_broker"
 version = "0.1.4"
 dependencies = [
  "anyhow",
- "bindgen 0.68.1",
+ "bindgen 0.69.1",
  "byteorder",
  "cc",
  "clap 4.4.8",
