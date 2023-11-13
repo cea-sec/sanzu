@@ -1753,7 +1753,17 @@ dependencies = [
  "cfg-if",
  "libc",
  "memoffset 0.7.1",
- "pin-utils",
+]
+
+[[package]]
+name = "nix"
+version = "0.27.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2eb04e9c688eff1c89d72b407f168cf79bb9e867a9d3323ed6c01519eb9cc053"
+dependencies = [
+ "bitflags 2.4.1",
+ "cfg-if",
+ "libc",
 ]
 
 [[package]]
@@ -2507,7 +2517,7 @@ dependencies = [
  "lock_keys",
  "log",
  "memmap2",
- "nix 0.26.4",
+ "nix 0.27.1",
  "notify-rust",
  "opus",
  "rayon",
@@ -2565,7 +2575,7 @@ dependencies = [
  "libgssapi",
  "log",
  "mio",
- "nix 0.26.4",
+ "nix 0.27.1",
  "rustls",
  "rustls-pemfile",
  "sanzu-common",
