@@ -64,11 +64,11 @@ winapi = { version = "0.3", features = [
   "impl-default", "winuser", "wingdi", "winbase", "libloaderapi", "processthreadsapi",
   "errhandlingapi", "winerror", "commctrl", "sysinfoapi", "shobjidl", "combaseapi",
   "commdlg", "d2d1", "objbase", "dwrite", "winnls", "shellapi", "wincodec", "stringapiset",
-  "d3d9", "d3d9types", "dwmapi", "d3d11", "dxgi1_2"] }
+  "d3d9", "d3d9types", "dwmapi", "d3d11", "dxgi1_2", "sspi"] }
 
 [target.'cfg(unix)'.dependencies]
 libgssapi = { version = "0.6", optional = true }
-nix = "0.26"
+nix = {version = "0.26", features = ["process"]}
 vsock = "0.3"
 x11-clipboard = "0.8"
 

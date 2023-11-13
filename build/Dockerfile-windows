@@ -11,6 +11,9 @@ RUN set -eux; \
     pacman -Sy archlinux-keyring --noconfirm;
 
 RUN set -eux; \
+    echo 'Server = http://ftp.u-strasbg.fr/linux/distributions/archlinux/$repo/os/$arch' > /etc/pacman.d/mirrorlist ;
+
+RUN set -eux; \
     pacman-key --populate; \
     pacman -Syu --noconfirm; \
     pacman -S --noconfirm \
@@ -80,6 +83,9 @@ RUN set -eux; \
 
 RUN set -eux; \
     sudo -u builduser bash -c 'pikaur --noconfirm --noedit -S mingw-w64-opus' ;
+
+RUN set -eux; \
+    sudo -u builduser bash -c 'pikaur --noconfirm --noedit -S mingw-w64-sdl2' ;
 
 
 WORKDIR /SRC
