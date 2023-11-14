@@ -14,7 +14,7 @@ winres = {git = "https://github.com/serpilliere/winres", branch="link_resources"
 
 [dependencies]
 anyhow = "1.0"
-byteorder = "1.4"
+byteorder = "1.5"
 clap = "4.4"
 cpal = "0.15"
 embedded-graphics = "0.8"
