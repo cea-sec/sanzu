@@ -20,8 +20,12 @@ fn load_private_key(filename: &str) -> Result<rustls::PrivateKey> {
 
     loop {
         match rustls_pemfile::read_one(&mut reader).context("Cannot parse private key file")? {
-            Some(rustls_pemfile::Item::RSAKey(key)) => return Ok(rustls::PrivateKey(key)),
-            Some(rustls_pemfile::Item::PKCS8Key(key)) => return Ok(rustls::PrivateKey(key)),
+            Some(rustls_pemfile::Item::Pkcs1Key(key)) => {
+                return Ok(rustls::PrivateKey(key.secret_pkcs1_der().to_vec()))
+            }
+            Some(rustls_pemfile::Item::Pkcs8Key(key)) => {
+                return Ok(rustls::PrivateKey(key.secret_pkcs8_der().to_vec()))
+            }
             None => {
                 return Err(anyhow!(
                     "No keys found in {:?} (encrypted keys not supported)",
@@ -37,11 +41,12 @@ fn load_private_key(filename: &str) -> Result<rustls::PrivateKey> {
 fn load_certs(filename: &str) -> Result<Vec<rustls::Certificate>> {
     let certfile = fs::File::open(filename).context("Cannot open certificate file")?;
     let mut reader = BufReader::new(certfile);
-    Ok(rustls_pemfile::certs(&mut reader)
-        .unwrap()
-        .iter()
-        .map(|v| rustls::Certificate(v.clone()))
-        .collect())
+    let mut certs = vec![];
+    for cert in rustls_pemfile::certs(&mut reader) {
+        let cert = rustls::Certificate(cert.context("Error in parse certifiate")?.to_vec());
+        certs.push(cert)
+    }
+    Ok(certs)
 }
 
 /// Apply tls operation to socket
@@ -152,7 +157,12 @@ pub fn make_client_config(
 
         let certfile = fs::File::open(cafile).context("Cannot open CA file")?;
         let mut reader = BufReader::new(certfile);
-        root_store.add_parsable_certificates(&rustls_pemfile::certs(&mut reader).unwrap());
+        let mut certs = vec![];
+        for cert in rustls_pemfile::certs(&mut reader) {
+            certs.push(cert.context("Error in parse certifiate")?);
+        }
+
+        root_store.add_parsable_certificates(&certs);
     } else {
         root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
             OwnedTrustAnchor::from_subject_spki_name_constraints(
