@@ -17,7 +17,7 @@ log = "0.4"
 prost = "0.12"
 rustls = "0.21"
 rustls-pemfile = "2.0"
-webpki-roots = "0.25"
+webpki-roots = "0.26"
 x509-parser = "0.15"
 
 [features]
