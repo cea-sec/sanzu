@@ -4,7 +4,7 @@ use memmap2::MmapOptions;
 use std::{collections::HashMap, fmt::Write as _, net::TcpStream, time::Instant};
 
 use std::{
-    convert::TryInto,
+    convert::TryFrom,
     fs, io,
     io::Read,
     io::Write,
@@ -298,26 +298,22 @@ pub fn do_run(
 
     debug!("Connected");
 
-    let tls_server_name_ok = arguments
-        .tls_server_name
-        .clone()
-        .unwrap_or_else(|| "no_server_name".to_string());
-    let server_name = tls_server_name_ok
-        .as_str()
-        .try_into()
-        .map_err(|err| anyhow!("Err {:?}", err))
-        .context("Error in dns server tls name")?;
-    let config = make_client_config(
-        arguments.tls_ca.as_deref(),
-        arguments.client_cert.as_deref(),
-        arguments.client_key.as_deref(),
-    )
-    .context("Error in make client tls config")?;
-    let mut conn = rustls::ClientConnection::new(config, server_name)
-        .context("Error in new ClientConnection")?;
-    let mut tls = rustls::Stream::new(&mut conn, &mut socket);
+    let mut conn;
+    let mut tls;
 
-    let server: &mut dyn ReadWrite = if arguments.tls_server_name.is_some() {
+    let server: &mut dyn ReadWrite = if let Some(tls_server_name) = &arguments.tls_server_name {
+        let dns_name = rustls_pki_types::DnsName::try_from(tls_server_name.to_string())
+            .context("Error in dnsname")?;
+        let server_name = rustls_pki_types::ServerName::DnsName(dns_name);
+        let config = make_client_config(
+            arguments.tls_ca.as_deref(),
+            arguments.client_cert.as_deref(),
+            arguments.client_key.as_deref(),
+        )
+        .context("Error in make client tls config")?;
+        conn = rustls::ClientConnection::new(config, server_name)
+            .context("Error in new ClientConnection")?;
+        tls = rustls::Stream::new(&mut conn, &mut socket);
         &mut tls
     } else {
         &mut socket

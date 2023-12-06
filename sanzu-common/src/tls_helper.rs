@@ -1,11 +1,8 @@
 pub use crate::ReadWrite;
 use anyhow::{Context, Result};
 use rustls::ServerConnection;
-use rustls::{
-    self,
-    server::{AllowAnyAnonymousOrAuthenticatedClient, AllowAnyAuthenticatedClient},
-    OwnedTrustAnchor, RootCertStore,
-};
+use rustls::{self, server::WebPkiClientVerifier, RootCertStore};
+use rustls_pki_types::{CertificateDer, CertificateRevocationListDer, PrivateKeyDer};
 use std::{
     fs,
     io::{BufReader, Read, Write},
@@ -14,18 +11,14 @@ use std::{
 use x509_parser::extensions::{GeneralName::RFC822Name, ParsedExtension, SubjectAlternativeName};
 
 /// Load private key from @filename
-fn load_private_key(filename: &str) -> Result<rustls::PrivateKey> {
+fn load_private_key(filename: &str) -> Result<PrivateKeyDer<'static>> {
     let keyfile = fs::File::open(filename).context("Cannot open private key file")?;
     let mut reader = BufReader::new(keyfile);
 
     loop {
         match rustls_pemfile::read_one(&mut reader).context("Cannot parse private key file")? {
-            Some(rustls_pemfile::Item::Pkcs1Key(key)) => {
-                return Ok(rustls::PrivateKey(key.secret_pkcs1_der().to_vec()))
-            }
-            Some(rustls_pemfile::Item::Pkcs8Key(key)) => {
-                return Ok(rustls::PrivateKey(key.secret_pkcs8_der().to_vec()))
-            }
+            Some(rustls_pemfile::Item::Pkcs1Key(key)) => return Ok(key.into()),
+            Some(rustls_pemfile::Item::Pkcs8Key(key)) => return Ok(key.into()),
             None => {
                 return Err(anyhow!(
                     "No keys found in {:?} (encrypted keys not supported)",
@@ -38,17 +31,27 @@ fn load_private_key(filename: &str) -> Result<rustls::PrivateKey> {
 }
 
 /// Load Certificates from @filename
-fn load_certs(filename: &str) -> Result<Vec<rustls::Certificate>> {
+fn load_certs(filename: &str) -> Result<Vec<CertificateDer<'static>>> {
     let certfile = fs::File::open(filename).context("Cannot open certificate file")?;
     let mut reader = BufReader::new(certfile);
     let mut certs = vec![];
     for cert in rustls_pemfile::certs(&mut reader) {
-        let cert = rustls::Certificate(cert.context("Error in parse certifiate")?.to_vec());
-        certs.push(cert)
+        let cert = cert.context("Error in parsing cert")?;
+        certs.push(cert);
     }
     Ok(certs)
 }
 
+/// Load ocsp from @filename
+fn load_ocsp(filename: &str) -> Result<Vec<u8>> {
+    let mut ret = Vec::new();
+
+    fs::File::open(filename)
+        .context("cannot open ocsp file")?
+        .read_to_end(&mut ret)
+        .context("Cannot read ocsp file")?;
+    Ok(ret)
+}
 /// Apply tls operation to socket
 fn tls_transfer<T: Read + Write>(server: &mut ServerConnection, socket: &mut T) -> Result<()> {
     if server.wants_write() {
@@ -78,6 +81,8 @@ pub fn tls_do_handshake<T: Read + Write>(
 /// Make tls server config from config file
 pub fn make_server_config(
     ca_file: &str,
+    crl_file: Option<&str>,
+    ocsp_file: Option<&str>,
     server_cert: &str,
     server_key: &str,
     auth_client: bool,
@@ -85,30 +90,58 @@ pub fn make_server_config(
     let mut client_auth_roots = RootCertStore::empty();
     let roots = load_certs(ca_file).context("Cannot load ca certificates")?;
     for root in roots {
-        client_auth_roots.add(&root).unwrap();
+        client_auth_roots
+            .add(root)
+            .context("Cannot add root cert")?;
     }
     let certs = load_certs(server_cert).context("Cannot load server ceritifactes")?;
 
-    let client_auth = if auth_client {
-        AllowAnyAuthenticatedClient::new(client_auth_roots).boxed()
+    let client_verifier = WebPkiClientVerifier::builder(client_auth_roots.into());
+    let client_verifier = if let Some(crl_file) = crl_file {
+        let mut crl_file = fs::File::open(crl_file).context("Cannot open crl file")?;
+        let mut crl = Vec::default();
+        crl_file
+            .read_to_end(&mut crl)
+            .context("Cannot read crl file")?;
+
+        client_verifier.with_crls([CertificateRevocationListDer::from(crl)])
     } else {
-        AllowAnyAnonymousOrAuthenticatedClient::new(client_auth_roots).boxed()
+        client_verifier
     };
 
-    let suites = rustls::ALL_CIPHER_SUITES.to_vec();
+    let client_verifier = if auth_client {
+        client_verifier
+    } else {
+        client_verifier.allow_unauthenticated()
+    };
+    let client_auth = client_verifier
+        .build()
+        .context("Cannot build client verifier")?;
+
+    let suites = rustls::crypto::ring::ALL_CIPHER_SUITES.to_vec();
 
     let versions = rustls::ALL_VERSIONS.to_vec();
 
     let privkey = load_private_key(server_key).context("Cannot load private key")?;
-    // TODO XXX: do OCSP?
-    let mut config = rustls::ServerConfig::builder()
-        .with_cipher_suites(&suites)
-        .with_safe_default_kx_groups()
-        .with_protocol_versions(&versions)
-        .context("Inconsistent cipher-suite/versions selected")?
-        .with_client_cert_verifier(client_auth)
-        .with_single_cert_with_ocsp_and_sct(certs, privkey, vec![], vec![])
-        .context("Bad certificates/private key")?;
+
+    let ocsp = if let Some(ocsp_file) = ocsp_file {
+        load_ocsp(ocsp_file).context("Error in load ocsp file")?
+    } else {
+        vec![]
+    };
+
+    let mut config = rustls::ServerConfig::builder_with_provider(
+        rustls::crypto::CryptoProvider {
+            cipher_suites: suites,
+            ..rustls::crypto::ring::default_provider()
+        }
+        .into(),
+    )
+    .with_protocol_versions(&versions)
+    .context("Inconsistent cipher-suite/versions selected")?
+    .with_client_cert_verifier(client_auth)
+    .with_single_cert_with_ocsp(certs, privkey, ocsp)
+    .context("Bad certificates/private key")?;
 
     config.key_log = Arc::new(rustls::KeyLogFile::new());
 
@@ -152,37 +185,32 @@ pub fn make_client_config(
 ) -> Result<Arc<rustls::ClientConfig>> {
     let mut root_store = RootCertStore::empty();
 
-    if ca_file.is_some() {
-        let cafile = ca_file.as_ref().unwrap();
-
-        let certfile = fs::File::open(cafile).context("Cannot open CA file")?;
+    if let Some(ca_file) = ca_file {
+        let certfile = fs::File::open(ca_file).context("Cannot open CA file")?;
         let mut reader = BufReader::new(certfile);
         let mut certs = vec![];
         for cert in rustls_pemfile::certs(&mut reader) {
-            certs.push(cert.context("Error in parse certifiate")?);
+            certs.push(cert.context("Error in parse certificate")?);
         }
-
-        root_store.add_parsable_certificates(&certs);
+        root_store.add_parsable_certificates(certs);
     } else {
-        root_store.add_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-            OwnedTrustAnchor::from_subject_spki_name_constraints(
-                ta.subject,
-                ta.spki,
-                ta.name_constraints,
-            )
-        }));
+        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned())
     }
 
-    let suites = rustls::DEFAULT_CIPHER_SUITES.to_vec();
+    let suites = rustls::crypto::ring::DEFAULT_CIPHER_SUITES.to_vec();
 
     let versions = rustls::DEFAULT_VERSIONS.to_vec();
 
-    let config = rustls::ClientConfig::builder()
-        .with_cipher_suites(&suites)
-        .with_safe_default_kx_groups()
-        .with_protocol_versions(&versions)
-        .context("Inconsistent cipher-suite/versions selected")?
-        .with_root_certificates(root_store);
+    let config = rustls::ClientConfig::builder_with_provider(
+        rustls::crypto::CryptoProvider {
+            cipher_suites: suites,
+            ..rustls::crypto::ring::default_provider()
+        }
+        .into(),
+    )
+    .with_protocol_versions(&versions)
+    .context("Inconsistent cipher-suite/versions selected")?
+    .with_root_certificates(root_store);
 
     let mut config = match (client_cert, client_key) {
         (Some(client_cert), Some(client_key)) => {
