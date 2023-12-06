@@ -104,6 +104,8 @@ fn auth_client(
 
     let tls_config = make_server_config(
         &config.tls.ca_file,
+        config.tls.crl_file.as_deref(),
+        config.tls.ocsp_file.as_deref(),
         &config.tls.auth_cert,
         &config.tls.auth_key,
         config.tls.allowed_client_domains.is_some(),
@@ -125,8 +127,8 @@ fn auth_client(
             .last()
             .map(Ok)
             .unwrap_or_else(|| Err(anyhow!("No cert from user")))?;
-        let (_data, cert) =
-            X509Certificate::from_der(&cert.0).context("Error in X509Certificate from der")?;
+        let (_, cert) =
+            X509Certificate::from_der(cert).context("Error in X509Certificate from der")?;
 
         let subj_alt_name =
             get_subj_alt_names(&cert).context("Error in get subject alternative name")?;

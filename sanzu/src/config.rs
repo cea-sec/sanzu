@@ -5,6 +5,8 @@ use std::{collections::HashMap, fs::File, io, io::Read, path::Path};
 pub struct ConfigTls {
     pub server_name: String,
     pub ca_file: String,
+    pub crl_file: Option<String>,
+    pub ocsp_file: Option<String>,
     pub auth_cert: String,
     pub auth_key: String,
     /// List of domains to authenticate clients
