@@ -38,7 +38,7 @@ serde = { version = "1.0", features = ["derive"] }
 serde_derive = "1.0"
 serde_yaml = "0.9"
 socket2 = {version = "0.5", features=['all'] }
-spin_sleep = "1.1"
+spin_sleep_util = "0.1"
 twelf = {version = "0.13.0", features=["toml"]}
 toml = "0.8"
 dbus = { version = "0.9", optional = true }
@@ -74,7 +74,7 @@ vsock = "0.4"
 x11-clipboard = "0.8"
 
 [dependencies.x11rb]
-version = "0.12"
+version = "0.13"
 features = ["shm", "xtest", "xfixes", "damage", "randr"]
 
 [package.metadata.deb]

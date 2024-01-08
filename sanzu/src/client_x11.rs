@@ -359,22 +359,20 @@ pub fn init_x11rb(
         .context("Error in query pict format reply")?;
 
     let mut bgra_format_id = 0;
-    let bgra_format = render::Directformat {
-        red_shift: 16,
-        red_mask: 255,
-        green_shift: 8,
-        green_mask: 255,
-        blue_shift: 0,
-        blue_mask: 255,
-        alpha_shift: 24,
-        alpha_mask: 255,
-    };
     for format in render_pict_format.formats.iter() {
-        let direct = format.direct;
+        let direct: x11rb::protocol::render::Directformat = format.direct;
         if format.depth != 32 {
             continue;
         }
-        if direct == bgra_format {
+        if direct.red_shift == 16
+            && direct.red_mask == 255
+            && direct.green_shift == 8
+            && direct.green_mask == 255
+            && direct.blue_shift == 0
+            && direct.blue_mask == 255
+            && direct.alpha_shift == 24
+            && direct.alpha_mask == 255
+        {
             bgra_format_id = format.id;
             break;
         }
