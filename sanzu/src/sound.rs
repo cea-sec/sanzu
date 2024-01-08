@@ -12,8 +12,6 @@ use std::{
     time::Duration,
 };
 
-use spin_sleep::sleep;
-
 /// Sampling frequency
 pub const SOUND_FREQ: u32 = 48000;
 pub const DECODER_BUFFER_MS: usize = 150;
@@ -200,7 +198,7 @@ impl SoundDecoder {
                     }
                 }
                 // Wait for buffer loading
-                sleep(Duration::from_millis(10));
+                std::thread::sleep(Duration::from_millis(10));
             }
         });
 
@@ -475,7 +473,7 @@ impl SoundEncoder {
                 }
 
                 if need_data {
-                    sleep(Duration::from_millis(10));
+                    std::thread::sleep(Duration::from_millis(10));
                     continue;
                 }
                 match &mut encoder {

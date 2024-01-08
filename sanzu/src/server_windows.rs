@@ -25,8 +25,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use spin_sleep::sleep;
-
 use winapi::{
     ctypes::c_void,
     shared::{
@@ -823,7 +821,7 @@ pub fn init_win(
                 unsafe { TranslateMessage(&msg) };
                 unsafe { DispatchMessageA(&msg) };
             }
-            sleep(Duration::from_millis(5));
+            std::thread::sleep(Duration::from_millis(5));
         }
     });
     init_d3d11().context("Cannot init d3d11")?;

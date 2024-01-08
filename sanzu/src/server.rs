@@ -14,7 +14,7 @@ use sanzu_common::{
     ReadWrite, Tunnel,
 };
 
-use spin_sleep::LoopHelper;
+use spin_sleep_util;
 use std::{
     net::{self, IpAddr, TcpListener},
     time::Instant,
@@ -392,7 +392,8 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
 
     let mut prev_time_start = Instant::now();
 
-    let mut loop_helper = LoopHelper::builder().build_with_target_rate(config.video.max_fps as f64); // limit FPS if possible
+    let mut loop_sleep =
+        spin_sleep_util::interval(std::time::Duration::from_secs(1) / config.video.max_fps as u32);
 
     let mut new_size = None;
     let mut cur_size = None;
@@ -430,7 +431,6 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
     let mut msg_stats = "".to_owned();
     let err = loop {
         let time_start = Instant::now();
-        loop_helper.loop_start();
 
         let mut events = vec![];
         if let Some((width, height)) = new_size.take() {
@@ -586,7 +586,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
         msg_stats = msg;
 
         prev_time_start = time_start;
-        loop_helper.loop_sleep(); // sleeps to acheive target FPS rate
+        loop_sleep.tick(); // sleeps to acheive target FPS rate
     };
 
     Err(err)

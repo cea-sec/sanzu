@@ -24,8 +24,6 @@ use std::{
 
 use sanzu_common::tunnel;
 
-use spin_sleep::sleep;
-
 use winapi::{
     ctypes::c_void,
     shared::{
@@ -1518,7 +1516,7 @@ pub fn init_wind3d(
                 unsafe { TranslateMessage(&msg) };
                 unsafe { DispatchMessageA(&msg) };
             }
-            sleep(Duration::from_millis(5));
+            std::thread::sleep(Duration::from_millis(5));
         }
         info!("Client end");
         unsafe { ExitProcess(0) };
