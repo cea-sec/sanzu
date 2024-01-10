@@ -392,7 +392,6 @@ dependencies = [
  "clang-sys",
  "lazy_static",
  "lazycell",
- "log",
  "peeking_take_while",
  "proc-macro2",
  "quote",
@@ -400,7 +399,6 @@ dependencies = [
  "rustc-hash",
  "shlex",
  "syn 1.0.109",
- "which",
 ]
 
 [[package]]
@@ -1547,9 +1545,9 @@ dependencies = [
 
 [[package]]
 name = "libgssapi"
-version = "0.6.4"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dcfb7f77cbefc242a46ea667491c4f1129712f563cd368623d3f1b261a90e5f"
+checksum = "c22f0430969e524b2177498ca3eeed48faca6f6c80f1b098d27ecbec84222f3a"
 dependencies = [
  "bitflags 2.4.1",
  "bytes",
@@ -1559,11 +1557,12 @@ dependencies = [
 
 [[package]]
 name = "libgssapi-sys"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efdcdd31923aa6280d41ff2636fd93a18cc60fe25983b24887d1a8d24478cbfb"
+checksum = "b57d9a71c774ec53b1b9119dbbcc589b5209831f0ddc0ff4210640051f545372"
 dependencies = [
- "bindgen 0.64.0",
+ "bindgen 0.69.1",
+ "pkg-config",
 ]
 
 [[package]]

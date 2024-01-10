@@ -30,7 +30,7 @@ fn setup_client_ctx(service_name: Name, desired_mechs: &OidSet) -> Result<Client
     let client_cred = Cred::acquire(None, None, CredUsage::Initiate, Some(desired_mechs))
         .context("Error in Cred::acquire")?;
     Ok(ClientCtx::new(
-        client_cred,
+        Some(client_cred),
         service_name,
         CtxFlags::GSS_C_MUTUAL_FLAG,
         Some(&GSS_MECH_KRB5),

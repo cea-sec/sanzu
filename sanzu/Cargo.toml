@@ -68,7 +68,7 @@ winapi = { version = "0.3", features = [
   "d3d9", "d3d9types", "dwmapi", "d3d11", "dxgi1_2", "sspi"] }
 
 [target.'cfg(unix)'.dependencies]
-libgssapi = { version = "0.6", optional = true }
+libgssapi = { version = "0.7", optional = true }
 nix = {version = "0.27", features = ["process"]}
 vsock = "0.4"
 x11-clipboard = "0.8"
