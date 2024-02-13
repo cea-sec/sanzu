@@ -35,7 +35,7 @@ almalinux9:
 		--env CARGO_OPT=$(CARGO_OPT) sanzu-builder:almalinux9
 
 windows:
-	docker build -t sanzu-builder:windows -f Dockerfile-windows .
+	docker build --no-cache -t sanzu-builder:windows -f Dockerfile-windows .
 	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} --env CARGO_OPT="-p sanzu --release --features=printfile" sanzu-builder:windows
 	docker run --rm -t $(DOCKER_OPT) -u ${DOCKER_USER} sanzu-builder:windows bash -c \
 		"cd /usr/x86_64-w64-mingw32/lib/ \
