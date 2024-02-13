@@ -1,4 +1,4 @@
-FROM alpine:latest
+FROM alpine:edge
 
 RUN apk add --no-cache cargo cmake g++ ffmpeg protoc ffmpeg-dev x264 \
     xcb-util linux-pam-dev curl bash \
