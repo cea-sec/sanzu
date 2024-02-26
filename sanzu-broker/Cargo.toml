@@ -19,7 +19,7 @@ env_logger = "0.11"
 libc = "0.2"
 log = "0.4"
 mio = { version = "0.8", features = ["net", "os-poll"] }
-nix = { version = "0.27", features = ["fs", "process"] }
+nix = { version = "0.28", features = ["fs", "process"] }
 rustls = "0.22"
 rustls-pemfile = "2.1"
 rustls-pki-types = { version="1",  features = ["std"] }
