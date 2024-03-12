@@ -39,7 +39,7 @@ serde_derive = "1.0"
 serde_yaml = "0.9"
 socket2 = {version = "0.5", features=['all'] }
 spin_sleep_util = "0.1"
-twelf = {version = "0.14.0", features=["toml"]}
+twelf = {version = "0.15.0", features=["toml"]}
 toml = "0.8"
 dbus = { version = "0.9", optional = true }
 dbus-crossroads = { version = "0.5", optional = true }
