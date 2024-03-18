@@ -135,7 +135,7 @@ fn auth_client(
         debug!("Alt name: {:?}", subj_alt_name);
 
         let tls_username = get_username_from_principal(&subj_alt_name, allowed_client_domains)
-            .context("Principal doesnt match realm pattern")?;
+            .context("Principal doesn't match realm pattern")?;
         info!("TLS authentication ok for user: {}", tls_username);
         username = Some(tls_username);
     };
@@ -223,7 +223,7 @@ fn loop_fwd_conn(
                         .context("Error in client read")?;
                     trace!("forward to server {:?}", size);
                     if size == 0 {
-                        debug!("Client closed connexion");
+                        debug!("Client closed connection");
                         stop = true;
                         break;
                     }
@@ -237,7 +237,7 @@ fn loop_fwd_conn(
                         .context("Error in server read")?;
                     trace!("forward to client {:?}", size);
                     if size == 0 {
-                        debug!("Server closed connexion");
+                        debug!("Server closed connection");
                         stop = true;
                         break;
                     }

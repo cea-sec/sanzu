@@ -396,7 +396,7 @@ pub fn set_clipboard(clipboard: &Clipboard, selection: i32, value: &str) -> Resu
             clipboard.getter.atoms.utf8_string,
             value.as_bytes(),
         )
-        .context("Error in clipboard strore")?;
+        .context("Error in clipboard store")?;
     Ok(())
 }
 

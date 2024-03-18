@@ -38,7 +38,7 @@ The encoding / decoding process relies on FFmpeg library. Different encoders / d
 The video encoder / decoder can be tweaked using a configuration file. In most cases, low latency configuration are preferred to limit lag between client and server. The configuration is described in `config.rs`. FFmpeg codec options are based on key / value tuple strings.
 
 ## Audio
-The audio capture / playback is done through the `cpal` library. From a capture point of view, the process fills in a circular buffer with the sound. This buffer is drained from the main loop and compressed, then sent to the client. Note that in case of network lag, the circular buffer is constantly updated with *fresh* sound. This way, when the network unstall, the content of the fresh sound is encoded and sent to the client.
+The audio capture / playback is done through the `cpal` library. From a capture point of view, the process fills in a circular buffer with the sound. This buffer is drained from the main loop and compressed, then sent to the client. Note that in case of network lag, the circular buffer is constantly updated with *fresh* sound. This way, when the network resumes, the content of the fresh sound is encoded and sent to the client.
 
 ## Keyboard
 Sanzu captures raw keyboard inputs, without language layout interpretation, and apply them to the server. The result is that only the server side keyboard layout matters in the process.

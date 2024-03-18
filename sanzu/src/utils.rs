@@ -100,7 +100,7 @@ pub struct ServerArgsConfig {
         long,
         short = 's',
         default_value_t = false,
-        help = "Seamless mode. Integrate remote windows in local environement"
+        help = "Seamless mode. Integrate remote windows in local environment"
     )]
     pub seamless: bool,
     #[clap(
@@ -300,7 +300,7 @@ the video buffer is exfiltrated using guest/host shared memory instead of
 tcp or vsock"
     )]
     pub extern_img_source: Option<String>,
-    #[clap(long, short = 'y', help = "Video source is xwd formated")]
+    #[clap(long, short = 'y', help = "Video source is xwd formatted")]
     pub source_is_xwd: bool,
     #[clap(
         long,
@@ -396,7 +396,7 @@ pub struct ProxyArgsConfig {
         help = "Use video source from file instead of video server api"
     )]
     pub extern_img_source: Option<String>,
-    #[clap(long, short = 'y', help = "Video source is xwd formated")]
+    #[clap(long, short = 'y', help = "Video source is xwd formatted")]
     pub source_is_xwd: bool,
     #[clap(
         long,

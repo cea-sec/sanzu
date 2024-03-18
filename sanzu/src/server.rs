@@ -92,7 +92,7 @@ fn auth_client(
         debug!("Alt name: {:?}", subj_alt_name);
 
         let username = get_username_from_principal(&subj_alt_name, allowed_client_domains)
-            .context("Principal doesnt match realm pattern")?;
+            .context("Principal doesn't match realm pattern")?;
 
         Some(username)
     } else {
@@ -586,7 +586,7 @@ pub fn run_server(config: &ConfigServer, arguments: &ServerArgsConfig) -> Result
         msg_stats = msg;
 
         prev_time_start = time_start;
-        loop_sleep.tick(); // sleeps to acheive target FPS rate
+        loop_sleep.tick(); // sleeps to achieve target FPS rate
     };
 
     Err(err)
