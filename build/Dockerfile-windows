@@ -55,7 +55,7 @@ RUN set -eux; \
       rsync \
       curl ; \
     cd /tmp ; \
-    curl -L -o /tmp/ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n4.4-latest-win64-gpl-shared-4.4.zip ; \
+    curl -L -o /tmp/ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n6.1-latest-win64-gpl-shared-6.1.zip ; \
     unzip /tmp/ffmpeg.zip ; cd /tmp/ffmpeg*/bin/ ; \
     for lib in *.dll ; do echo ${lib} ; \
         cp $lib /usr/x86_64-w64-mingw32/lib/${lib} ; \
