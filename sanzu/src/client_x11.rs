@@ -264,7 +264,7 @@ pub fn init_x11rb(
         (screen_width, screen_height)
     };
 
-    // Force the resolution to be less thant the server side
+    // Force the resolution to be less than the server side
     let width = width.min(screen_width);
     let height = height.min(screen_height);
 
@@ -800,7 +800,7 @@ impl Client for ClientInfo {
                         y: event.event_y as u32,
                     };
 
-                    /* If multiple mose moves, keep only last one */
+                    /* If multiple mouse moves, keep only last one */
                     last_move = Some(tunnel::MessageClient {
                         msg: Some(tunnel::message_client::Msg::Move(eventmove)),
                     });

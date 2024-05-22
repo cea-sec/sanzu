@@ -185,7 +185,7 @@ impl SoundDecoder {
                             real_output.into_iter().collect();
                         sound_q.lock().unwrap().append(&mut data);
                         {
-                            // Forget old datas if we are lagging more than audio_buffer_ms
+                            // Forget old data if we are lagging more than audio_buffer_ms
                             let sound_max_len =
                                 (audio_buffer_ms as usize * SOUND_FREQ as usize * 2) / 1000;
                             let mut sound_data = sound_q.lock().unwrap();

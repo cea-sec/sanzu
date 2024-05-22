@@ -83,7 +83,7 @@ pub fn do_kerberos_client_auth(
 
     // Check realm
     let username = get_username_from_principal(&ctx_info.source_name.to_string(), allowed_realms)
-        .context("Principal doesnt match realm pattern")
+        .context("Principal doesn't match realm pattern")
         .map_err(|err| send_server_err_event(sock, err))?;
 
     debug!("Auth kerberos ok for client {:?}", username);
