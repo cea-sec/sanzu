@@ -1052,8 +1052,8 @@ fn create_area(server: &mut ServerX11, root: Window, window: Window) -> bool {
     if let Ok(area) = init_area(&server.conn, root, window, &server.atoms) {
         // find first free id, insert area
         for index in 0.. {
-            if server.areas.get(&index).is_none() {
-                server.areas.insert(index, area);
+            if let std::collections::hash_map::Entry::Vacant(e) = server.areas.entry(index) {
+                e.insert(area);
                 return true;
             }
         }
