@@ -139,60 +139,60 @@
 				Source='$(var.CargoTargetBinDir)/sanzu_server.exe'
 				KeyPath='yes'/>
 			</Component>
-			<Component Id='avcodec_58' Guid='*'>
+			<Component Id='avcodec' Guid='*'>
 			    <File
-				Id='avcodec_58'
-				Name='avcodec-58.dll'
+				Id='avcodec_60'
+				Name='avcodec-60.dll'
 				DiskId='1'
-				Source='./avcodec-58.dll'
+				Source='./avcodec-60.dll'
 				KeyPath='yes'/>
 			</Component>
-			<Component Id='avdevice_58' Guid='*'>
+			<Component Id='avdevice' Guid='*'>
 			    <File
-				Id='avdevice_58'
-				Name='avdevice-58.dll'
+				Id='avdevice_60'
+				Name='avdevice-60.dll'
 				DiskId='1'
-				Source='./avdevice-58.dll'
+				Source='./avdevice-60.dll'
 				KeyPath='yes'/>
 			</Component>
-			<Component Id='avfilter_7' Guid='*'>
+			<Component Id='avfilter' Guid='*'>
 			    <File
-				Id='avfilter_7'
-				Name='avfilter-7.dll'
+				Id='avfilter_9'
+				Name='avfilter-9.dll'
 				DiskId='1'
-				Source='./avfilter-7.dll'
+				Source='./avfilter-9.dll'
 				KeyPath='yes'/>
 			</Component>
-			<Component Id='avformat_58' Guid='*'>
+			<Component Id='avformat' Guid='*'>
 			    <File
-				Id='avformat_58'
-				Name='avformat-58.dll'
+				Id='avformat_60'
+				Name='avformat-60.dll'
 				DiskId='1'
-				Source='./avformat-58.dll'
+				Source='./avformat-60.dll'
 				KeyPath='yes'/>
 			</Component>
-			<Component Id='avutil_56' Guid='*'>
+			<Component Id='avutil' Guid='*'>
 			    <File
-				Id='avutil_56'
-				Name='avutil-56.dll'
+				Id='avutil_58'
+				Name='avutil-58.dll'
 				DiskId='1'
-				Source='./avutil-56.dll'
+				Source='./avutil-58.dll'
 				KeyPath='yes'/>
 			</Component>
-			<Component Id='swresample_3' Guid='*'>
+			<Component Id='swresample' Guid='*'>
 			    <File
-				Id='swresample_3'
-				Name='swresample-3.dll'
+				Id='swresample_4'
+				Name='swresample-4.dll'
 				DiskId='1'
-				Source='./swresample-3.dll'
+				Source='./swresample-4.dll'
 				KeyPath='yes'/>
 			</Component>
-			<Component Id='swscale_5' Guid='*'>
+			<Component Id='swscale' Guid='*'>
 			    <File
-				Id='swscale_5'
-				Name='swscale-5.dll'
+				Id='swscale_7'
+				Name='swscale-7.dll'
 				DiskId='1'
-				Source='./swscale-5.dll'
+				Source='./swscale-7.dll'
 				KeyPath='yes'/>
 			</Component>
 		    </Directory>
@@ -218,13 +218,13 @@
 	    <ComponentRef Id='sanzu_proxy'/>
 	    <ComponentRef Id='sanzu_client'/>
 	    <ComponentRef Id='sanzu_server'/>
-	    <ComponentRef Id='avcodec_58'/>
-	    <ComponentRef Id='avdevice_58'/>
-	    <ComponentRef Id='avfilter_7'/>
-	    <ComponentRef Id='avformat_58'/>
-	    <ComponentRef Id='avutil_56'/>
-	    <ComponentRef Id='swresample_3'/>
-	    <ComponentRef Id='swscale_5'/>
+	    <ComponentRef Id='avcodec'/>
+	    <ComponentRef Id='avdevice'/>
+	    <ComponentRef Id='avfilter'/>
+	    <ComponentRef Id='avformat'/>
+	    <ComponentRef Id='avutil'/>
+	    <ComponentRef Id='swresample'/>
+	    <ComponentRef Id='swscale'/>
 
 	    <Feature
 		Id='Environment'
