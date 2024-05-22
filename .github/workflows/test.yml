@@ -89,7 +89,7 @@ jobs:
 
     - name: dl full ffmpeg binaries
       run: |
-        curl -L  -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n4.4-latest-win64-gpl-shared-4.4.zip
+        curl -L -o ffmpeg.zip https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n6.1-latest-win64-gpl-shared-6.1.zip
 
     - name: dl full ffmpeg binaries
       run: |
@@ -97,7 +97,7 @@ jobs:
 
     - name: cp files
       run: |
-         cp ffmpeg\ffmpeg-n4.4-latest-win64-gpl-shared-4.4\bin\* .
+         cp ffmpeg\ffmpeg-n6.1-latest-win64-gpl-shared-6.1\bin\* .
 
     - name: install cargo wix
       run: |
