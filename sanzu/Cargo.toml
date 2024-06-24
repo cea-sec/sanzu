@@ -23,7 +23,7 @@ env_logger = "0.11"
 err-derive = "0.3"
 ffmpeg-sys-next = "7.0"
 hound = "3.5"
-lazy_static = "1.4"
+lazy_static = "1.5"
 libc = "0.2"
 lock_keys = {git="https://github.com/risoflora/lock_keys", rev="38d97697c054d56e40c3975c0add04c33a05e4f4"}
 log = "0.4"
