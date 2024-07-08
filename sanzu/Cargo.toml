@@ -59,7 +59,7 @@ default = ["kerberos"]
 
 
 [target.'cfg(windows)'.dependencies]
-clipboard-win = "5.1"
+clipboard-win = "5.4"
 ico = "0.3"
 winapi = { version = "0.3", features = [
   "impl-default", "winuser", "wingdi", "winbase", "libloaderapi", "processthreadsapi",
