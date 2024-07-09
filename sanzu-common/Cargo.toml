@@ -14,7 +14,7 @@ anyhow = "1.0"
 byteorder = "1.5"
 env_logger = "0.11"
 log = "0.4"
-prost = "0.12"
+prost = "0.13"
 rustls = "0.22"
 rustls-pemfile = "2.1"
 rustls-pki-types = { version="1",  features = ["std"] }
