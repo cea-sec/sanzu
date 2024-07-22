@@ -33,7 +33,7 @@ pub struct Video {
     /// too little number of frames will result in a client graphic window with
     /// very little details, and stall like this until the graphic change.
     pub max_stall_img: u32,
-    /// Holds the command line to execute to retreive special ffmpeg options to
+    /// Holds the command line to execute to retrieve special ffmpeg options to
     /// apply to the codec (which can be generated dynamically
     pub ffmpeg_options_cmd: Option<String>,
     /// Socket control path
@@ -58,7 +58,7 @@ pub struct ExportVideoPci {
     pub device: String,
 }
 
-/// Support authentication mecanism
+/// Support authentication mechanism
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", content = "args")]
 pub enum AuthType {

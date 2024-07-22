@@ -575,7 +575,7 @@ fn connect_to_dbus(notif_sender: Sender<Notifications>) -> Result<dbus::blocking
     dbus_conn.start_receive(
         rule,
         Box::new(move |msg, _| {
-            // TODO XXX we may want to filter special caracters ?
+            // TODO XXX we may want to filter special characters ?
             let notifications = notification_extract_message(msg);
             let notifications = Notifications { notifications };
             notif_sender
@@ -779,7 +779,7 @@ pub fn init_x11rb(
     .context("Error in damage create check")?;
 
     conn.damage_subtract(damage, 0u32, 0u32)
-        .context("Error in damage substract")?;
+        .context("Error in damage subtract")?;
 
     let screen_width = screen.width_in_pixels;
     let screen_height = screen.height_in_pixels;
@@ -790,7 +790,7 @@ pub fn init_x11rb(
         (screen_width, screen_height)
     };
 
-    // Force the resolution to be less thant the server side
+    // Force the resolution to be less than the server side
     let width = width.min(screen_width);
     let height = height.min(screen_height);
 
@@ -843,7 +843,7 @@ pub fn init_x11rb(
         }
     }
 
-    /* Add root's chidren windows */
+    /* Add root's children windows */
     let children = get_window_children(&conn, root).context("Cannot get root children")?;
     debug!("ROOT Windows: {}", children.len());
     for window in children {
@@ -911,7 +911,7 @@ pub fn init_x11rb(
     let height = grabinfo.height;
 
     del_custom_video_mode(&conn, window_info).context("Error in del_custom_video_mode")?;
-    // If we are already stucked in custom mode, update index accordingly
+    // If we are already stuck in custom mode, update index accordingly
     let video_mode_index = usize::from(
         utils_x11::get_video_mode(&conn, window_info, VIDEO_NAME_2)
             .context("Error in get_video_mode")?
