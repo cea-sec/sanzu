@@ -130,7 +130,7 @@ impl Drop for AVPacket {
 #[derive(Debug)]
 pub struct AVFrame {
     /// Raw pointer on the AVFrame
-    pub ptr: *mut ffmpeg::AVFrame,
+    ptr: *mut ffmpeg::AVFrame,
 }
 
 impl AVFrame {
@@ -143,11 +143,11 @@ impl AVFrame {
         }
     }
 
-    pub fn as_mut_ptr(&self) -> *mut ffmpeg::AVFrame {
+    pub fn get_ptr(&self) -> *mut ffmpeg::AVFrame {
         self.ptr
     }
 
-    pub fn make_writable(&mut self) -> Result<()> {
+    pub fn make_writable(&self) -> Result<()> {
         let retval: i32 = unsafe { ffmpeg::av_frame_make_writable(self.ptr) };
         if retval < 0 {
             return Err(averror("av_frame_make", retval));
@@ -155,7 +155,7 @@ impl AVFrame {
         Ok(())
     }
 
-    pub fn plane(&mut self, indx: usize, len: usize) -> &mut [u8] {
+    pub fn plane(&self, indx: usize, len: usize) -> &mut [u8] {
         unsafe {
             let data_ptr = (*self.ptr).data[indx];
             std::slice::from_raw_parts_mut(data_ptr, len)

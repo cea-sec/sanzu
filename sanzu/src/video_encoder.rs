@@ -105,7 +105,7 @@ impl EncoderBuilder {
             return Err(averror("avcodec_open2", retval));
         }
         let frame = AVFrame::new()?;
-        let frame_ptr = frame.as_mut_ptr();
+        let frame_ptr = frame.get_ptr();
         unsafe {
             (*frame_ptr).format = (*context_ptr).pix_fmt as i32;
             (*frame_ptr).width = (*context_ptr).width;
@@ -224,15 +224,15 @@ impl Encoder for EncoderFFmpeg {
     ) -> Result<(Vec<u8>, EncoderTimings)> {
         let time_start = Instant::now();
 
-        let pixel_format = unsafe { (*self.frame.ptr).format };
+        let pixel_format = unsafe { (*self.frame.get_ptr()).format };
 
         match pixel_format {
             x if x == AVPixelFormat::AV_PIX_FMT_YUV420P as i32 => {
                 // yuv420
                 let (y_lane, u_lane, v_lane) = unsafe {
-                    let y_lane = (*self.frame.ptr).linesize[0] as u32;
-                    let u_lane = (*self.frame.ptr).linesize[1] as u32;
-                    let v_lane = (*self.frame.ptr).linesize[2] as u32;
+                    let y_lane = (*self.frame.get_ptr()).linesize[0] as u32;
+                    let u_lane = (*self.frame.get_ptr()).linesize[1] as u32;
+                    let v_lane = (*self.frame.get_ptr()).linesize[2] as u32;
                     (y_lane, u_lane, v_lane)
                 };
 
@@ -305,9 +305,9 @@ impl Encoder for EncoderFFmpeg {
             x if x == AVPixelFormat::AV_PIX_FMT_YUV444P as i32 => {
                 // yuv444
                 let (y_lane, u_lane, v_lane) = unsafe {
-                    let y_lane = (*self.frame.ptr).linesize[0] as u32;
-                    let u_lane = (*self.frame.ptr).linesize[1] as u32;
-                    let v_lane = (*self.frame.ptr).linesize[2] as u32;
+                    let y_lane = (*self.frame.get_ptr()).linesize[0] as u32;
+                    let u_lane = (*self.frame.get_ptr()).linesize[1] as u32;
+                    let v_lane = (*self.frame.get_ptr()).linesize[2] as u32;
                     (y_lane, u_lane, v_lane)
                 };
 
@@ -380,8 +380,8 @@ impl Encoder for EncoderFFmpeg {
             x if x == AVPixelFormat::AV_PIX_FMT_NV12 as i32 => {
                 // nv12
                 let (y_lane, uv_lane) = unsafe {
-                    let y_lane = (*self.frame.ptr).linesize[0] as u32;
-                    let uv_lane = (*self.frame.ptr).linesize[1] as u32;
+                    let y_lane = (*self.frame.get_ptr()).linesize[0] as u32;
+                    let uv_lane = (*self.frame.get_ptr()).linesize[1] as u32;
                     (y_lane, uv_lane)
                 };
 
@@ -447,7 +447,7 @@ impl Encoder for EncoderFFmpeg {
                 let image_bpl = bytes_per_line as usize;
                 let height = height as usize;
 
-                let plane_bpl = unsafe { (*self.frame.ptr).linesize[0] } as usize;
+                let plane_bpl = unsafe { (*self.frame.get_ptr()).linesize[0] } as usize;
                 let size = plane_bpl * height;
                 self.frame
                     .make_writable()
@@ -481,13 +481,12 @@ impl Encoder for EncoderFFmpeg {
         };
 
         unsafe {
-            (*self.frame.as_mut_ptr()).pts = count;
+            (*self.frame.get_ptr()).pts = count;
         }
         let time_yuv = Instant::now();
 
-        let mut retval = unsafe {
-            ffmpeg::avcodec_send_frame(self.context.as_mut_ptr(), self.frame.as_mut_ptr())
-        };
+        let mut retval =
+            unsafe { ffmpeg::avcodec_send_frame(self.context.as_mut_ptr(), self.frame.get_ptr()) };
         if retval < 0 {
             return Err(averror("avcodec_send_frame", retval));
         }
