@@ -130,7 +130,7 @@ impl Drop for AVPacket {
 #[derive(Debug)]
 pub struct AVFrame {
     /// Raw pointer on the AVFrame
-    pub ptr: *mut ffmpeg::AVFrame,
+    ptr: *mut ffmpeg::AVFrame,
 }
 
 impl AVFrame {
@@ -143,7 +143,11 @@ impl AVFrame {
         }
     }
 
-    pub fn as_mut_ptr(&self) -> *mut ffmpeg::AVFrame {
+    pub fn as_mut_ptr(&mut self) -> *mut ffmpeg::AVFrame {
+        self.ptr
+    }
+
+    pub fn as_ptr(&self) -> *mut ffmpeg::AVFrame {
         self.ptr
     }
 
