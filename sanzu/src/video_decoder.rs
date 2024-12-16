@@ -69,7 +69,7 @@ fn decode(
     let mut duration_yuv = Duration::new(0, 0);
     let context_ptr = decoder.context.as_mut_ptr();
     let packet_ptr = decoder.packet.as_mut_ptr();
-    let frame_ptr = decoder.frame.as_mut_ptr();
+    let frame_ptr = decoder.frame.get_ptr();
 
     let mut ret = unsafe { ffmpeg::avcodec_send_packet(context_ptr, packet_ptr) };
 
