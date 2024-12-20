@@ -63,7 +63,7 @@ impl EncoderBuilder {
         }
     }
 
-    /// Set command line to exectue to retreive options on encoder regeneration
+    /// Set command line to execute to retrieve options on encoder regeneration
     fn set_command(&mut self, command: &str) -> Result<()> {
         debug!("set_command: {:?}", command);
         self.command = Some(command.to_owned());
@@ -73,7 +73,7 @@ impl EncoderBuilder {
     /// Generate FFmpeg encoder
     fn open(mut self) -> Result<EncoderFFmpeg> {
         if let Some(ref command) = &self.command {
-            info!("Spawn custom command retreive");
+            info!("Spawn custom command retrieve");
             let child = process::Command::new(command)
                 .output()
                 .context("Cannot run ffmpeg options command")?;

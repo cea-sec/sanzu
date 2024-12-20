@@ -768,7 +768,7 @@ pub fn init_win(
     thread::spawn(move || {
         let instance_handle = unsafe { GetModuleHandleA(null_mut()) };
         info!("Create window {} {}", screen_width, screen_height);
-        let class_name = CString::new("D3D").expect("Couldnt create CString");
+        let class_name = CString::new("D3D").expect("Couldn't create CString");
         let class_name_ptr = class_name.as_ptr();
 
         let wc = WNDCLASSEXA {
@@ -952,7 +952,7 @@ impl Server for ServerInfo {
                     };
                 }
                 Some(tunnel::message_client::Msg::Key(event)) => {
-                    if let Some((keycode, extened)) =
+                    if let Some((keycode, extended)) =
                         utils_win::hardware_keycode_to_windows_scancode(event.keycode)
                     {
                         let mut input = INPUT {
@@ -967,7 +967,7 @@ impl Server for ServerInfo {
                                 keyb.dwFlags |= KEYEVENTF_KEYUP;
                             }
                             keyb.dwFlags |= KEYEVENTF_SCANCODE;
-                            if extened {
+                            if extended {
                                 keyb.dwFlags |= KEYEVENTF_EXTENDEDKEY;
                             }
                             keyb.time = 0;

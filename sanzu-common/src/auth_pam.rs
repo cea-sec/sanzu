@@ -41,7 +41,7 @@ impl pam::Conversation for &mut TunnelConversation<'_> {
         Ok(out)
     }
     fn info(&mut self, msg: &CStr) {
-        let msg_string = msg.to_str().expect("Error in cstr convertion");
+        let msg_string = msg.to_str().expect("Error in cstr conversion");
 
         let pam_msg = tunnel::pam_conversation::Msg::Info(msg_string.to_string());
         let pam_info = tunnel::PamConversation { msg: Some(pam_msg) };
@@ -49,7 +49,7 @@ impl pam::Conversation for &mut TunnelConversation<'_> {
             .expect("Error in info send");
     }
     fn error(&mut self, msg: &CStr) {
-        let msg_string = msg.to_str().expect("Eror in cstr conversion");
+        let msg_string = msg.to_str().expect("Error in cstr conversion");
 
         let pam_msg = tunnel::pam_conversation::Msg::Error(msg_string.to_string());
         let pam_err = tunnel::PamConversation { msg: Some(pam_msg) };
@@ -127,7 +127,7 @@ pub fn do_pam_auth(conn: &mut dyn ReadWrite, pam_name: &str) -> Result<String> {
     match final_user {
         None => Err(send_server_err_event(
             *conn.lock().unwrap(),
-            anyhow!("Pam Authentification failed"),
+            anyhow!("Pam Authentication failed"),
         )),
         Some(username) => Ok(username),
     }

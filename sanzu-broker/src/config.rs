@@ -24,7 +24,7 @@ pub struct CmdCallBack {
     pub on_connect: Command,
 }
 
-/// Support authentication mecanism
+/// Support authentication mechanism
 #[derive(Debug, Serialize, Deserialize, Clone)]
 #[serde(tag = "type", content = "args")]
 pub enum AuthType {
