@@ -1720,7 +1720,7 @@ impl Client for ClientWindows {
             info!("Request to print file {:?}", file);
             if !file.chars().all(|c| {
                 (char::is_alphanumeric(c) || char::is_ascii_punctuation(&c))
-                    && (c != '/' && 'c' != '\\')
+                    && (c != '/' && c != '\\')
             }) {
                 return Err(anyhow!("Bad filename {:?}", file));
             }
