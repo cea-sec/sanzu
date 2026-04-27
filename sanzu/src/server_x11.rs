@@ -186,7 +186,7 @@ fn init_grab<C: Connection>(
 
     // Video is exported via tcp / vsock
     let shmid = unsafe {
-        let ret = shmget(libc::IPC_PRIVATE, size, libc::IPC_CREAT | 0o777);
+        let ret = shmget(libc::IPC_PRIVATE, size, libc::IPC_CREAT | 0o700);
         if ret < 0 {
             return Err(anyhow!("Error in shmget"));
         }
