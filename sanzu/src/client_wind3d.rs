@@ -1725,6 +1725,10 @@ impl Client for ClientWindows {
                 return Err(anyhow!("Bad filename {:?}", file));
             }
 
+            if !file.ends_with(".pdf") {
+                return Err(anyhow!("Only pdf are allowed"));
+            }
+
             let path = std::path::Path::new(printdir);
             let filepath = path.join(file);
             info!("Print file path {:?}", filepath);
