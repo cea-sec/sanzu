@@ -1553,7 +1553,7 @@ impl Client for ClientWindows {
         areas_vec.sort();
         if areas_vec != self.cur_areas {
             debug!("Send new shape");
-            // /* Compute additionnal windows */
+            // /* Compute additional windows */
             let mut areas_added = vec![];
             let cur_ids = self
                 .cur_areas
